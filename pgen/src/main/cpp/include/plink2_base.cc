@@ -15,7 +15,7 @@
 // along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
 
-#include "plink2_base.h"
+#include "include/plink2_base.h"
 
 #ifdef __cplusplus
 namespace plink2 {

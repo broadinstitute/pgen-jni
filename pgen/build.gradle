@@ -1,0 +1,23 @@
+plugins {
+    id 'java'
+    id 'dev.nokee.jni-library'
+    id 'dev.nokee.cpp-language'
+}
+
+repositories {
+    // Use Maven Central for resolving dependencies.
+    mavenCentral()
+}
+
+dependencies {
+    // Use TestNG framework, also requires calling test.useTestNG() below
+    testImplementation 'org.testng:testng:7.4.0'
+}
+
+targetCompatibility = 1.8
+
+
+tasks.named('test') {
+    // Use TestNG for unit tests.
+    useTestNG()
+}
