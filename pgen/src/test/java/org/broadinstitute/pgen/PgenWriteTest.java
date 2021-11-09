@@ -3,12 +3,15 @@
  */
 package org.broadinstitute.pgen;
 
+import htsjdk.io.HtsPath;
+import htsjdk.samtools.util.IOUtil;
 import org.testng.annotations.*;
 import static org.testng.Assert.*;
 
 public class PgenWriteTest {
     @Test public void someLibraryMethodReturnsTrue() {
-        PgenWrite classUnderTest = new PgenWrite();
-        assertTrue(classUnderTest.test(), "someLibraryMethod should return 'true'");
+        PgenWriter classUnderTest = new PgenWriter(new HtsPath("out.pgen"), 2);
+
+        assertEquals(classUnderTest.test(), 10);
     }
 }
