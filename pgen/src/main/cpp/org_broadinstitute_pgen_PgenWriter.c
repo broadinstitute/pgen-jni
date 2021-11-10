@@ -1,8 +1,28 @@
 #include "org_broadinstitute_pgen_PgenWriter.h"
+#include "include/pgenlib_write.h"
 
 JNIEXPORT jint JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_init(JNIEnv *, jclass, jint value){
     return value;
+}
+
+typedef struct BookKeepingStruct {
+    plink2::STPgenWriter* spgwp;
+    uintptr_t alloc_cacheline_ct_ptr;
+    uint32_t max_vrec_len;
+} BookKeeping;
+
+JNIEXPORT jlong JNICALL
+Java_org_broadinstitute_pgen_PgenWriter_createPgenMetadata (JNIEnv *env, jclass thisObject){
+    BookKeeping* bookKeepingPtr = (BookKeeping*)malloc(sizeof(BookKeepingStruct));
+    if (bookKeepingPtr == NULL){
+       //todo
+    }
+    bookKeepingPtr->spgwp = (plink2::STPgenWriter*)malloc(sizeof(plink2::STPgenWriter));
+    if (bookKeepingPtr->spgwp == NULL){
+       //todo
+    }
+    return (jlong) bookKeepingPtr;
 }
 
 //  def __cinit__(self, bytes filename, uint32_t sample_ct,
@@ -49,12 +69,26 @@ Java_org_broadinstitute_pgen_PgenWriter_init(JNIEnv *, jclass, jint value){
 //        cdef PglErr reterr = SpgwInitPhase1(fname, NULL, self._nonref_flags, variant_ct, sample_ct, 0, phase_dosage_gflags, nonref_flags_storage, self._state_ptr, &alloc_cacheline_ct, &max_vrec_len)
 
 JNIEXPORT jint JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject, jstring filename, jlong numberOfVariants){
-    const char* cFilename = env->env->GetStringUTFChars(filename, NULL)
-    uint32_t sampleCount = 1
-    //             filename  ?      nonrefflags          variantCount         samplecount  ? phase_dosageGflags,
-    SpgwInitPhase1(cFilename, NULL, NULL,       (uint32_t) numberOfVariants), sampleCount, 0, )
-    return (jint) 0;
+Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject,
+                                                 jstring filename,
+                                                 jlong numberOfVariants,
+                                                 jlong sampleCount,
+                                                 jlong bookKeepingHandle){
+    const char* cFilename = env->GetStringUTFChars(filename, NULL);
+    BookKeeping* bookKeepingPtr = (BookKeeping*)bookKeepingHandle;
+
+    return (jint) plink2::SpgwInitPhase1(  cFilename, //filename
+                     NULL,  // allele index offsets ( for multi allele)
+                     NULL,  // non-ref flags
+                     (uint32_t) numberOfVariants, // number of variants
+                     (uint32_t) sampleCount, // sample count
+                      0, // optional max allele count
+                      0, // type: PgenGlobalFlags phase dosage gflags (genotype?)
+                      0, //  non-ref flags storage
+                      bookKeepingPtr->spgwp , // STPgenWriter * spgwp
+                      &(bookKeepingPtr->alloc_cacheline_ct_ptr) , //  uintptr_t* alloc_cacheline_ct_ptr
+                      &(bookKeepingPtr->max_vrec_len)  // max vrec len ptr
+                     );
 }
 
 //        if reterr != kPglRetSuccess:
