@@ -11,7 +11,5 @@ import static org.testng.Assert.*;
 public class PgenWriteTest {
     @Test public void someLibraryMethodReturnsTrue() {
         PgenWriter classUnderTest = new PgenWriter(new HtsPath("out.pgen"), 2,  1);
-
-        assertEquals(classUnderTest.test(), 10);
     }
 }

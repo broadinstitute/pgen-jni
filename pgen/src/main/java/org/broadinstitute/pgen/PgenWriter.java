@@ -7,9 +7,7 @@ import htsjdk.io.HtsPath;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.writer.VariantContextWriter;
 import htsjdk.variant.vcf.VCFHeader;
-import sun.nio.ch.DirectBuffer;
 
-import java.io.IOException;
 
 public class PgenWriter implements VariantContextWriter {
 
@@ -18,14 +16,6 @@ public class PgenWriter implements VariantContextWriter {
     static {
         System.loadLibrary("pgen");
     }
-
-
-
-    public int test(){
-        return init(10);
-    }
-
-    private static native int init(int value);
 
     public PgenWriter(HtsPath file, long numberOfVariants, int numberOfSamples){
         bookKeepingHandle = createPgenMetadata();

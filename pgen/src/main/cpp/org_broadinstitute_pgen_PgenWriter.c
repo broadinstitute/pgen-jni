@@ -1,10 +1,7 @@
 #include "org_broadinstitute_pgen_PgenWriter.h"
+#include "PgenJniUtils.h"
 #include "include/pgenlib_write.h"
-
-JNIEXPORT jint JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_init(JNIEnv *, jclass, jint value){
-    return value;
-}
+#include <string>
 
 typedef struct BookKeepingStruct {
     plink2::STPgenWriter* spgwp;
@@ -77,7 +74,10 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject
     const char* cFilename = env->GetStringUTFChars(filename, NULL);
     BookKeeping* bookKeepingPtr = (BookKeeping*)bookKeepingHandle;
 
-    return (jint) plink2::SpgwInitPhase1(  cFilename, //filename
+    uintptr_t alloc_cacheline_ct_ptr;
+    uint32_t max_vrec_len;
+
+    const plink2::PglErr init1Result = plink2::SpgwInitPhase1(  cFilename, //filename
                      NULL,  // allele index offsets ( for multi allele)
                      NULL,  // non-ref flags
                      (uint32_t) numberOfVariants, // number of variants
@@ -86,22 +86,35 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject
                       0, // type: PgenGlobalFlags phase dosage gflags (genotype?)
                       0, //  non-ref flags storage
                       bookKeepingPtr->spgwp , // STPgenWriter * spgwp
-                      &(bookKeepingPtr->alloc_cacheline_ct_ptr) , //  uintptr_t* alloc_cacheline_ct_ptr
-                      &(bookKeepingPtr->max_vrec_len)  // max vrec len ptr
-                     );
+                      &alloc_cacheline_ct_ptr , //  uintptr_t* alloc_cacheline_ct_ptr
+                      &max_vrec_len);  // max vrec len ptr
+
+
+     //        if reterr != kPglRetSuccess:
+     //            raise RuntimeError("SpgwInitPhase1() error " + str(reterr))
+    checkPglErr(env, init1Result, "Initialization phase 1 failed");
+
+    //        cdef uint32_t genovec_cacheline_ct = DivUp(sample_ct, kNypsPerCacheline)
+    //        cdef uint32_t dosage_main_cacheline_ct = DivUp(sample_ct, (2 * kInt32PerCacheline))
+    uint32_t genovec_cacheline_ct = plink2::DivUp(sampleCount, plink2::kNypsPerCacheline);
+    uint32_t dosage_main_cacheline_ct = plink2::DivUp(sampleCount, (2 * plink2::kInt32PerCacheline));
+
+    //        cdef unsigned char* spgw_alloc
+    //        if cachealigned_malloc((alloc_cacheline_ct + genovec_cacheline_ct + 3 * bitvec_cacheline_ct + dosage_main_cacheline_ct) * kCacheline, &spgw_alloc):
+    //            raise MemoryError()
+    unsigned char* spgw_alloc;
+    //todo work out the varis cacheline ct values that I skpped cachealigned_malloc((alloc_cacheline_ct + genovec_cacheline_ct + 3 * bitvec_cacheline_ct + dosage_main_cacheline_ct) * kCacheline, &spgw_alloc);
+
+    //        SpgwInitPhase2(max_vrec_len, self._state_ptr, spgw_alloc)
+    //        self._genovec = <uintptr_t*>(&(spgw_alloc[alloc_cacheline_ct * kCacheline]))
+    //        self._phasepresent = <uintptr_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct) * kCacheline]))
+    //        self._phaseinfo = <uintptr_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct + bitvec_cacheline_ct) * kCacheline]))
+    //        self._dosage_present = <uintptr_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct + 2 * bitvec_cacheline_ct) * kCacheline]))
+    //        self._dosage_main = <uint16_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct + 3 * bitvec_cacheline_ct) * kCacheline]))
+    //        return
+    SpgwInitPhase2(max_vrec_len, self._state_ptr, spgw_alloc)
+    return 0;
 }
 
-//        if reterr != kPglRetSuccess:
-//            raise RuntimeError("SpgwInitPhase1() error " + str(reterr))
-//        cdef uint32_t genovec_cacheline_ct = DivUp(sample_ct, kNypsPerCacheline)
-//        cdef uint32_t dosage_main_cacheline_ct = DivUp(sample_ct, (2 * kInt32PerCacheline))
-//        cdef unsigned char* spgw_alloc
-//        if cachealigned_malloc((alloc_cacheline_ct + genovec_cacheline_ct + 3 * bitvec_cacheline_ct + dosage_main_cacheline_ct) * kCacheline, &spgw_alloc):
-//            raise MemoryError()
-//        SpgwInitPhase2(max_vrec_len, self._state_ptr, spgw_alloc)
-//        self._genovec = <uintptr_t*>(&(spgw_alloc[alloc_cacheline_ct * kCacheline]))
-//        self._phasepresent = <uintptr_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct) * kCacheline]))
-//        self._phaseinfo = <uintptr_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct + bitvec_cacheline_ct) * kCacheline]))
-//        self._dosage_present = <uintptr_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct + 2 * bitvec_cacheline_ct) * kCacheline]))
-//        self._dosage_main = <uint16_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct + 3 * bitvec_cacheline_ct) * kCacheline]))
-//        return
+
+
