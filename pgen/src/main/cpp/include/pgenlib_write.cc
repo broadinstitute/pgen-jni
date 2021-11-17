@@ -814,7 +814,15 @@ uint32_t SaveOnebit(const uintptr_t* __restrict genovec, uint32_t common2_code, 
 // returns vrec_len
 uint32_t PwcAppendBiallelicGenovecMain(const uintptr_t* __restrict genovec, uint32_t vidx, PgenWriterCommon* pwcp, uint32_t* het_ct_ptr, uint32_t* altxy_ct_ptr, unsigned char* vrtype_ptr) {
   const uint32_t sample_ct = pwcp->sample_ct;
-  assert((!(sample_ct % kBitsPerWordD2)) || (!(genovec[sample_ct / kBitsPerWordD2] >> (2 * (sample_ct % kBitsPerWordD2)))));
+  printf("sample_ct %% kBitsPerWordD2 = %d \n", sample_ct % kBitsPerWordD2);
+//  printf("genovec[sample_ct / kBitsPerWordD2] = %d\n", genovec[sample_ct / kBitsPerWordD2]);
+//  printf("(2 * (sample_ct % kBitsPerWordD2))) = %d\n", 2 * (sample_ct % kBitsPerWordD2));
+//  printf("!(sample_ct %% kBitsPerWordD2)) || (!(genovec[sample_ct / kBitsPerWordD2] >> (2 * (sample_ct % kBitsPerWordD2)) =%d \n", !(sample_ct % kBitsPerWordD2) || (!(genovec[sample_ct / kBitsPerWordD2] >> (2 * (sample_ct % kBitsPerWordD2)))));
+//  printf("\n");
+
+  printf("sample_ct %% kBitsPerWordD2 = %d \n", sample_ct % kBitsPerWordD2);
+  assert(!(sample_ct % kBitsPerWordD2));
+  assert(!(genovec[sample_ct / kBitsPerWordD2] >> (2 * (sample_ct % kBitsPerWordD2))));
   STD_ARRAY_DECL(uint32_t, 4, genocounts);
   GenoarrCountFreqsUnsafe(genovec, sample_ct, genocounts);
   if (het_ct_ptr) {

@@ -5,12 +5,23 @@ package org.broadinstitute.pgen;
 
 import htsjdk.io.HtsPath;
 import htsjdk.samtools.util.IOUtil;
+import htsjdk.variant.variantcontext.VariantContext;
+import htsjdk.variant.variantcontext.VariantContextBuilder;
+import htsjdk.variant.vcf.VCFFileReader;
 import org.testng.annotations.*;
+
+import java.io.File;
+
 import static org.testng.Assert.*;
 
 public class PgenWriteTest {
     @Test public void someLibraryMethodReturnsTrue() {
-        PgenWriter classUnderTest = new PgenWriter(new HtsPath("out.pgen"), 0,  1);
-        classUnderTest.close();
+        try(VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false)) {
+            PgenWriter writer = new PgenWriter(new HtsPath("out.pgen"), 6, 3);
+            for (VariantContext vc : reader) {
+                writer.add(vc);
+            }
+            writer.close();
+        }
     }
 }

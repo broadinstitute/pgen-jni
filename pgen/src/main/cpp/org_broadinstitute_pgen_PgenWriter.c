@@ -1,6 +1,7 @@
 #include "org_broadinstitute_pgen_PgenWriter.h"
 #include "PgenJniUtils.h"
 #include "include/pgenlib_write.h"
+#include  "pgenlib_ffi_support.h"
 #include <string>
 
 typedef struct BookKeepingStruct {
@@ -15,6 +16,11 @@ typedef struct BookKeepingStruct {
     uint16_t* dosage_main;
 
 } BookKeeping;
+
+static void throwErrorMessage( JNIEnv* env, const char* message ) {
+    jclass exceptionClass = env->FindClass("org/broadinstitute/pgen/PgenJniException");
+    if ( exceptionClass ) env->ThrowNew(exceptionClass, message);
+}
 
 JNIEXPORT jlong JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_createPgenMetadata (JNIEnv *env, jclass thisObject){
@@ -128,6 +134,35 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject
     return 0;
 }
 
+//cpdef append_alleles(self, np.ndarray[np.int32_t,mode="c"] allele_int32, bint all_phased = False):
+//        cdef int32_t* allele_codes = <int32_t*>(&(allele_int32[0]))
+//        cdef uintptr_t* genovec = self._genovec
+//        cdef PglErr reterr
+//        if not all_phased:
+//            AlleleCodesToGenoarrUnsafe(allele_codes, NULL, SpgwGetSampleCt(self._state_ptr), genovec, NULL, NULL)
+//            reterr = SpgwAppendBiallelicGenovec(genovec, self._state_ptr)
+//        else:
+//            AlleleCodesToGenoarrUnsafe(allele_codes, NULL, SpgwGetSampleCt(self._state_ptr), genovec, NULL, self._phaseinfo)
+//            reterr = SpgwAppendBiallelicGenovecHphase(genovec, NULL, self._phaseinfo, self._state_ptr)
+//        if reterr != kPglRetSuccess:
+//            raise RuntimeError("append_alleles() error " + str(reterr))
+//        return
+JNIEXPORT void JNICALL
+Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv* env, jobject object,
+                                                      jlong bookKeepingHandle,
+                                                      jobject alleleBuffer){
+    const int32_t* allele_codes = (int32_t*)env->GetDirectBufferAddress(alleleBuffer);
+    if ( !allele_codes ) {
+        throwErrorMessage(env, "C code can't get address for seqs ByteBuffer");
+        return;
+    }
+    BookKeeping* bookKeepingPtr = (BookKeeping*)bookKeepingHandle;
+    uintptr_t* genovec = bookKeepingPtr->genovec;
+    plink2::PglErr reterr;
+    plink2::AlleleCodesToGenoarrUnsafe(allele_codes, NULL, plink2::SpgwGetSampleCt(bookKeepingPtr->spgwp), genovec, NULL, NULL);
+    reterr = plink2::SpgwAppendBiallelicGenovec(genovec, bookKeepingPtr->spgwp);
+    checkPglErr(env, reterr, "Failure while adding genotypes");
+}
 
 JNIEXPORT void JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_closePgen (JNIEnv * env, jobject object, jlong bookKeepingHandle){
@@ -143,5 +178,22 @@ Java_org_broadinstitute_pgen_PgenWriter_closePgen (JNIEnv * env, jobject object,
     }
 
    checkPglErr(env, SpgwFinish(bookKeepingPtr->spgwp), "Error while closing PgenFile");
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_broadinstitute_pgen_PgenWriter_createBuffer( JNIEnv* env, jclass cls, jint length ) {
+    void* buf = malloc(length);
+    if ( !buf ) {
+        throwErrorMessage(env, "C code can't allocate memory for  buffer");
+        return 0;
+    }
+    return env->NewDirectByteBuffer(buf, length);
+}
+
+JNIEXPORT void JNICALL
+Java_org_broadinstitute_pgen_PgenWriter_destroyByteBuffer( JNIEnv* env, jclass cls, jobject byteBuf ) {
+    void* buf = env->GetDirectBufferAddress(byteBuf);
+    if ( !buf ) throwErrorMessage(env, "C code can't get ByteBuffer address");
+    free(buf);
 }
 
