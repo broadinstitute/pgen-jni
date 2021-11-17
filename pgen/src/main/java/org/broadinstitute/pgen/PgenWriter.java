@@ -32,7 +32,7 @@ public class PgenWriter implements VariantContextWriter {
 
     @Override
     public void close() {
-
+        closePgen(bookKeepingHandle);
     }
 
     @Override
@@ -52,4 +52,6 @@ public class PgenWriter implements VariantContextWriter {
 
     private static native long createPgenMetadata();
     private static native int openPgen(String file, long numberOfVariants, long numberOfSamples, long bookKeepingHandle);
+//    private static native void appendBiallelic(long bookKeepingHandle, )
+    private native void closePgen(long bookKeepingHandle);
 }

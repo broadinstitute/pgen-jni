@@ -7,6 +7,13 @@ typedef struct BookKeepingStruct {
     plink2::STPgenWriter* spgwp;
     uintptr_t alloc_cacheline_ct_ptr;
     uint32_t max_vrec_len;
+
+    uintptr_t* genovec; //Genotype vector
+    uintptr_t* phasepresent;
+    uintptr_t* phaseinfo;
+    uintptr_t* dosage_present;
+    uint16_t* dosage_main;
+
 } BookKeeping;
 
 JNIEXPORT jlong JNICALL
@@ -89,6 +96,7 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject
                       &alloc_cacheline_ct_ptr , //  uintptr_t* alloc_cacheline_ct_ptr
                       &max_vrec_len);  // max vrec len ptr
 
+    uint32_t bitvec_cacheline_ct = plink2::DivUp(sampleCount, plink2::kBitsPerCacheline);
 
      //        if reterr != kPglRetSuccess:
      //            raise RuntimeError("SpgwInitPhase1() error " + str(reterr))
@@ -99,11 +107,10 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject
     uint32_t genovec_cacheline_ct = plink2::DivUp(sampleCount, plink2::kNypsPerCacheline);
     uint32_t dosage_main_cacheline_ct = plink2::DivUp(sampleCount, (2 * plink2::kInt32PerCacheline));
 
-    //        cdef unsigned char* spgw_alloc
-    //        if cachealigned_malloc((alloc_cacheline_ct + genovec_cacheline_ct + 3 * bitvec_cacheline_ct + dosage_main_cacheline_ct) * kCacheline, &spgw_alloc):
-    //            raise MemoryError()
     unsigned char* spgw_alloc;
-    //todo work out the varis cacheline ct values that I skpped cachealigned_malloc((alloc_cacheline_ct + genovec_cacheline_ct + 3 * bitvec_cacheline_ct + dosage_main_cacheline_ct) * kCacheline, &spgw_alloc);
+    if (plink2::cachealigned_malloc((alloc_cacheline_ct_ptr + genovec_cacheline_ct + 3 * bitvec_cacheline_ct + dosage_main_cacheline_ct) * plink2::kCacheline, &spgw_alloc)){
+        //todo handle malloc fail
+    }
 
     //        SpgwInitPhase2(max_vrec_len, self._state_ptr, spgw_alloc)
     //        self._genovec = <uintptr_t*>(&(spgw_alloc[alloc_cacheline_ct * kCacheline]))
@@ -112,9 +119,29 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject
     //        self._dosage_present = <uintptr_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct + 2 * bitvec_cacheline_ct) * kCacheline]))
     //        self._dosage_main = <uint16_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct + 3 * bitvec_cacheline_ct) * kCacheline]))
     //        return
-    SpgwInitPhase2(max_vrec_len, self._state_ptr, spgw_alloc)
+    SpgwInitPhase2(max_vrec_len, bookKeepingPtr->spgwp, spgw_alloc);
+    bookKeepingPtr->genovec = (uintptr_t*)(&(spgw_alloc[alloc_cacheline_ct_ptr * plink2::kCacheline]));
+    bookKeepingPtr->phasepresent = (uintptr_t*)(&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct) * plink2::kCacheline]));
+    bookKeepingPtr->phaseinfo = (uintptr_t*)(&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct + bitvec_cacheline_ct) * plink2::kCacheline]));
+    bookKeepingPtr->dosage_present = (uintptr_t*)(&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct + 2 * bitvec_cacheline_ct) * plink2::kCacheline]));
+    bookKeepingPtr->dosage_main = (uint16_t*)(&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct + 3 * bitvec_cacheline_ct) * plink2::kCacheline]));
     return 0;
 }
 
 
+JNIEXPORT void JNICALL
+Java_org_broadinstitute_pgen_PgenWriter_closePgen (JNIEnv * env, jobject object, jlong bookKeepingHandle){
+    BookKeeping* bookKeepingPtr = (BookKeeping*)bookKeepingHandle;
+    uint32_t declaredVariantCt = plink2::SpgwGetVariantCt(bookKeepingPtr->spgwp);
+    uint32_t writtenVariantCt = plink2::SpgwGetVidx(bookKeepingPtr->spgwp);
+    if ( declaredVariantCt != writtenVariantCt) {
+        char errbuff[200];
+        sprintf(errbuff, "PgenWriter.close() called when number of written variants (%d) unequal to initially declared value (%d)", writtenVariantCt, declaredVariantCt);
+        jclass exceptionClass = env->FindClass("org/broadinstitute/pgen/PgenJniException");
+        env->ThrowNew(exceptionClass, errbuff);
+        return;
+    }
+
+   checkPglErr(env, SpgwFinish(bookKeepingPtr->spgwp), "Error while closing PgenFile");
+}
 

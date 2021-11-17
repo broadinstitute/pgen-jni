@@ -10,6 +10,7 @@ import static org.testng.Assert.*;
 
 public class PgenWriteTest {
     @Test public void someLibraryMethodReturnsTrue() {
-        PgenWriter classUnderTest = new PgenWriter(new HtsPath("out.pgen"), 2,  1);
+        PgenWriter classUnderTest = new PgenWriter(new HtsPath("out.pgen"), 0,  1);
+        classUnderTest.close();
     }
 }

@@ -4,6 +4,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class PgenJniException extends RuntimeException {
+    public PgenJniException(String message){
+        super(message);
+    }
+
     public PgenJniException(String message, int errorCode){
         super(message + " caused by: " + PglErr.getCorrespondingError(errorCode) + "(" + errorCode +")");
     }
