@@ -6,3 +6,7 @@ build
 
 #Ignore .idea directory
 .idea
+
+#OSX junk
+*.DS_Store
+
