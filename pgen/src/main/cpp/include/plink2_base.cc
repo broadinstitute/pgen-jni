@@ -1,4 +1,4 @@
-// This library is part of PLINK 2.00, copyright (C) 2005-2021 Shaun Purcell,
+// This library is part of PLINK 2.00, copyright (C) 2005-2022 Shaun Purcell,
 // Christopher Chang.
 //
 // This library is free software: you can redistribute it and/or modify it
@@ -23,7 +23,7 @@ namespace plink2 {
 
 uintptr_t g_failed_alloc_attempt_size = 0;
 
-#if (__GNUC__ <= 4) && (__GNUC_MINOR__ < 7) && !defined(__APPLE__)
+#if (((__GNUC__ == 4) && (__GNUC_MINOR__ < 7)) || (__GNUC__ >= 11)) && !defined(__APPLE__)
 BoolErr pgl_malloc(uintptr_t size, void* pp) {
   *S_CAST(unsigned char**, pp) = S_CAST(unsigned char*, malloc(size));
   if (likely(*S_CAST(unsigned char**, pp))) {

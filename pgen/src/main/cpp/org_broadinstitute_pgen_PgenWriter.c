@@ -96,6 +96,7 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject
                      (uint32_t) numberOfVariants, // number of variants
                      (uint32_t) sampleCount, // sample count
                       0, // optional max allele count
+                      plink2::kPgenWriteSeparateIndex, //todo PgenWriteMode == kPgenWriteSeparateIndex
                       0, // type: PgenGlobalFlags phase dosage gflags (genotype?)
                       0, //  non-ref flags storage
                       bookKeepingPtr->spgwp , // STPgenWriter * spgwp
