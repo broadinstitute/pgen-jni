@@ -2,6 +2,9 @@
 #include "PgenJniUtils.h"
 #include "include/pgenlib_write.h"
 #include  "pgenlib_ffi_support.h"
+#include "coffeecatch.h"
+#include "coffeejni.h"
+
 #include <string>
 
 typedef struct BookKeepingStruct {
@@ -161,7 +164,12 @@ Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv* env, jobject objec
     uintptr_t* genovec = bookKeepingPtr->genovec;
     plink2::PglErr reterr;
     plink2::AlleleCodesToGenoarrUnsafe(allele_codes, NULL, plink2::SpgwGetSampleCt(bookKeepingPtr->spgwp), genovec, NULL, NULL);
-    reterr = plink2::SpgwAppendBiallelicGenovec(genovec, bookKeepingPtr->spgwp);
+    COFFEE_TRY(){
+        reterr = plink2::SpgwAppendBiallelicGenovec(genovec, bookKeepingPtr->spgwp));
+    } COFFEE_CATCH() {
+        const char*const message = coffeecatch_get_message();
+        fprintf(stderr, "**FATAL ERROR: %s\n", message);
+     } COFFEE_END();
     checkPglErr(env, reterr, "Failure while adding genotypes");
 }
 
