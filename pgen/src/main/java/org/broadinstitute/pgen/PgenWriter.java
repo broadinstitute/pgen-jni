@@ -12,6 +12,7 @@ import htsjdk.variant.vcf.VCFConstants;
 import htsjdk.variant.vcf.VCFHeader;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +31,9 @@ public class PgenWriter implements VariantContextWriter {
 
     public PgenWriter(HtsPath file, long numberOfVariants, int numberOfSamples){
         bookKeepingHandle = createPgenMetadata();
-        alleleBuffer = createBuffer(numberOfSamples*2*4);//samples * ploidy * bytes in int32
+        alleleBuffer = createBuffer(numberOfSamples*2*4); //samples * ploidy * bytes in int32
+        alleleBuffer.order(ByteOrder.LITTLE_ENDIAN);
+
         if(openPgen(file.getRawInputString(), numberOfVariants, numberOfSamples, bookKeepingHandle ) != 0){
             throw new RuntimeException("failed");
         }
@@ -89,6 +92,7 @@ public class PgenWriter implements VariantContextWriter {
             throw new IllegalStateException("Allele buffer is not completely filled, we have a problem. " +
                     "Position: " + alleleBuffer.position() + " Expected " + alleleBuffer.limit());
         }
+        alleleBuffer.rewind();
         appendAlleles(bookKeepingHandle, alleleBuffer);
     }
 
