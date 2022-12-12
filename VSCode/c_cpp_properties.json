@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "name": "Mac",
+            "includePath": [
+                "/Library/Java/JavaVirtualMachines/adoptopenjdk-8.jdk/Contents/Home/include",
+                "/Library/Java/JavaVirtualMachines/adoptopenjdk-8.jdk/Contents/Home/include/darwin",
+                "${workspaceFolder}/pgen/build/generated/jni-headers",
+                "${workspaceFolder}/**",
+                "/usr/local/boost"
+            ],
+            "defines": [],
+            "macFrameworkPath": [],
+            "compilerPath": "/usr/bin/clang",
+            "cppStandard": "c++11",
+            "intelliSenseMode": "macos-clang-x64",
+            "configurationProvider": "ms-vscode.makefile-tools"
+        }
+    ],
+    "version": 4
+}

@@ -1,7 +1,13 @@
+import org.gradle.internal.os.OperatingSystem
+
+// See the repo README.md to understand how to use this file to build to publish the pgen-jni jar.
+
 plugins {
     id 'java'
     id 'dev.nokee.jni-library'
     id 'dev.nokee.cpp-language'
+    id 'maven-publish'
+    id 'com.palantir.git-version' version '3.0.0'
 }
 
 repositories {
@@ -9,17 +15,197 @@ repositories {
     mavenCentral()
 }
 
+final isRelease = Boolean.getBoolean("release")
+version = gitVersion().replaceAll(".dirty", "") + (isRelease ?  "" : "-SNAPSHOT")
+
+sourceCompatibility = 1.17
+targetCompatibility = 1.17
+
+library {
+    targetMachines = [machines.macOS.x86_64, machines.linux.x86_64]
+}
+
+buildTypes {
+    debug
+    release
+}
+
 dependencies {
-    api 'com.github.samtools:htsjdk:2.24.1'
+    api 'com.github.samtools:htsjdk:3.0.0'
+    implementation 'org.apache.commons:commons-lang3:3.5'
+    implementation 'commons-io:commons-io:2.5'
+
+    // use the zstd implementation that is used by org.apache.commons:commons-compress directly
+    implementation 'com.github.luben:zstd-jni:1.5.5-5' // contains a native component
+
+    nativeImplementation project(':pgen-lib')
 
     // Use TestNG framework, also requires calling test.useTestNG() below
     testImplementation 'org.testng:testng:7.4.0'
 }
 
-targetCompatibility = 1.8
+// Some compiler configuration
+tasks.withType(CppCompile).configureEach {
+    // For now, reach into the private headers folder of pgen-lib and call functions there directly.
+    // Eventually, pgen-lib should expose a public API via .h files in it's "public" include folder,
+    // and this can be removed (the dev.nokee plugin appears to automatically include the "public"
+    // folder of any dependent project in the -I list for this project).
+    includes {
+        "${project(':pgen-lib').projectDir}/src/main/headers"
+    }
+    
+    //establish C++11 as the language version/dialects(s)
+    compilerArgs.add "-std=c++11"
+}
 
+jar {
+    // add the native component (for the platform on which we're running) to the default jar
+    dependsOn {
+        if (OperatingSystem.current().isMacOsX()) {
+            sharedLibraryMacos
+        } else if (OperatingSystem.current().isLinux()) {
+            sharedLibraryLinux
+        } else {
+            throw org.gradle.api.tasks.StopExecutionException("Unsupported build platform - only linux and macos are supported");
+        }
+    }
+
+    if (OperatingSystem.current().isMacOsX()) {
+        if (isRelease) {
+            throw org.gradle.api.tasks.StopExecutionException("Unsupported release platform. Release/publish task can only be run on linux.");
+        } else {
+            from("$project.buildDir/libs/main/macos") {
+                include "libpgen.dylib"
+            }
+        }
+    } else if (OperatingSystem.current().isLinux()) {
+        if (isRelease) {
+
+            println "**********************************************************************************************************************************"
+            println ""
+            println "  Building a jar on linux: the release jar will contain the macos libpgen.dylib that is checked into the mac_dylib folder"
+            println ""
+            println "**********************************************************************************************************************************"
+ 
+            from("$project.rootDir/mac_dylib") {
+                include "libpgen.dylib"
+            }
+        }
+        from("$project.buildDir/libs/main/linux") {
+            include "libpgen.so"
+        }
+    } else {
+        throw org.gradle.api.tasks.StopExecutionException("Unsupported build platform - only linux and macos are supported");
+    }
+
+    manifest {
+        attributes  'Implementation-Title': 'pgen-jni',
+            'Implementation-Vendor': 'Broad Institute GATK Development Team',
+            // Implementation-version is used at runtime to stamp the output .pvar with a source and version number
+            'Implementation-Version': version
+    }
+}
 
 tasks.named('test') {
     // Use TestNG for unit tests.
     useTestNG()
+    testLogging {
+        showStandardStreams = true
+    }
+    // set the variable that causes the native component to be loaded from java.library.path so that we can run
+    // tests locally (ie., from VS Code) without a jar
+    jvmArgs += "-DLOAD_PGEN_FROM_LIBRARY_PATH=true"
+    if (OperatingSystem.current().isMacOsX()) {
+        jvmArgs += "-Djava.library.path=/Users/cnorman/projects/pgen-jni/pgen/build/libs/main/macos"
+    } else if (OperatingSystem.current().isLinux()) {
+        jvmArgs += "-Djava.library.path=/Users/cnorman/projects/pgen-jni/pgen/build/libs/main/linux"
+    } else {
+        throw org.gradle.api.tasks.StopExecutionException("Unsupported build platform - only linux and macos are supported");
+    }
+}
+
+javadoc {
+    // This is a hack to disable the java default javadoc lint until we fix the html formatting
+    // We only want to do this for the javadoc task, not gatkDoc
+    options.addStringOption('Xdoclint:none', '-quiet')
+    source = sourceSets.main.allJava
+    include '**/*.java'
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    archiveClassifier = 'javadoc'
+    from "$buildDir/docs"
+}
+
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allSource
+    archiveClassifier = 'sources'
+}
+
+def basePomConfiguration = {
+    packaging = 'jar'
+    description = 'JNI Wrapper for pgenlib'
+    url = 'http://github.com/broadinstitute/pgen-jni'
+
+    scm {
+        url = 'scm:git@github.com:broadinstitute/gatk.git'
+        connection = 'scm:git@github.com:broadinstitute/pgen-jni.git'
+        developerConnection = 'scm:git@github.com:broadinstitute/pgen-jni.git'
+    }
+
+    developers {
+        developer {
+            id = 'gatkdev'
+            name = 'GATK Development Team'
+            email = 'gatk-dev-public@broadinstitute.org'
+        }
+    }
+
+    licenses {
+        license {
+            name = 'Apache 2.0'
+            url = 'https://github.com/broadinstitute/gatk/blob/master/LICENSE.TXT'
+            distribution = 'repo'
+        }
+    }
+}
+
+publishing {
+    publications {
+        pgenlib(MavenPublication) {
+            //from components.java
+            artifact jar
+            artifactId = "pgenlib"
+            pom basePomConfiguration
+
+            artifact sourcesJar
+            artifact javadocJar
+        }
+    }
+
+    repositories {
+        maven {
+            name = "SonaType"
+            url =  "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+            credentials {
+                username = project.findProperty("sonatypeUsername")
+                password = project.findProperty("sonatypePassword")
+            }
+        }
+
+        maven {
+            name = "Artifactory"
+            url = "https://broadinstitute.jfrog.io/broadinstitute/libs-snapshot-local/"
+            credentials {
+                username = System.env.ARTIFACTORY_USERNAME
+                password = System.env.ARTIFACTORY_PASSWORD
+            }
+        }
+    }
+}
+
+publish {
+    doFirst {
+        println "Attempting to upload version:$version"
+    }
 }
