@@ -9,15 +9,38 @@ repositories {
     mavenCentral()
 }
 
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+library {
+    targetMachines = [machines.macOS.x86_64, machines.linux.x86_64]
+}
+
+buildTypes {
+    debug
+    release
+}
+
 dependencies {
+    //TODO upgrade to 3.0.3
     api 'com.github.samtools:htsjdk:2.24.1'
+
+    nativeImplementation project(':pgen-lib')
 
     // Use TestNG framework, also requires calling test.useTestNG() below
     testImplementation 'org.testng:testng:7.4.0'
 }
 
-targetCompatibility = 1.8
-
+// Some compiler configuration
+tasks.withType(CppCompile).configureEach {
+    // For now, reach into the private headers folder of pgen-lib and call functions there directly.
+    // Eventually, pgen-lib should expose a public API via .h files in it's "public" include folder,
+    // and this can be removed (the dev.nokee plugin appears to automatically include the "public"
+    // folder of any dependent project in the -I list for this project automatically).
+    includes {
+        "${project(':pgen-lib').projectDir}/src/main/headers"
+    }
+}
 
 tasks.named('test') {
     // Use TestNG for unit tests.

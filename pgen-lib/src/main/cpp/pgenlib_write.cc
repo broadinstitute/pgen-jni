@@ -15,7 +15,7 @@
 // along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
 
-#include "include/pgenlib_write.h"
+#include "pgenlib_write.h"
 
 #include <unistd.h>  // unlink()
 

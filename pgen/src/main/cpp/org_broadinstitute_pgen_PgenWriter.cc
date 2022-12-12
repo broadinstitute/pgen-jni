@@ -1,7 +1,7 @@
 #include "org_broadinstitute_pgen_PgenWriter.h"
 #include "PgenJniUtils.h"
-#include "include/pgenlib_write.h"
-#include  "pgenlib_ffi_support.h"
+#include "pgenlib_write.h"
+#include "pgenlib_ffi_support.h"
 #include <string>
 
 typedef struct BookKeepingStruct {
@@ -28,6 +28,7 @@ Java_org_broadinstitute_pgen_PgenWriter_createPgenMetadata (JNIEnv *env, jclass 
     if (bookKeepingPtr == NULL){
        //todo
     }
+
     bookKeepingPtr->spgwp = (plink2::STPgenWriter*)malloc(sizeof(plink2::STPgenWriter));
     if (bookKeepingPtr->spgwp == NULL){
        //todo

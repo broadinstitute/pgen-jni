@@ -1,0 +1,14 @@
+plugins {
+	id 'dev.nokee.cpp-library'
+	id 'cpp-unit-test'
+}
+
+ repositories {
+     // Use Maven Central for resolving dependencies.
+     mavenCentral()
+}
+
+library {
+    targetMachines = [machines.macOS.x86_64, machines.linux.x86_64]
+    targetLinkages = [linkages.static]
+ }

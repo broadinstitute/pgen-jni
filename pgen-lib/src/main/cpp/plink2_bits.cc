@@ -15,7 +15,7 @@
 // along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
 
-#include "include/plink2_bits.h"
+#include "plink2_bits.h"
 
 #ifdef __cplusplus
 namespace plink2 {

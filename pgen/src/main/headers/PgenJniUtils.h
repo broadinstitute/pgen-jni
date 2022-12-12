@@ -1,7 +1,7 @@
 #ifndef __PGEN_JNI_UTILS__
 #define __PGEN_JNI_UTILS__
 
-#include "include/pgenlib_write.h"
+#include "pgenlib_write.h"
 #include <jni.h>
 
 //Check and throw a java exception if we returned an error.

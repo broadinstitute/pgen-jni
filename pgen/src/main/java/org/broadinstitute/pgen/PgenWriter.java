@@ -25,10 +25,13 @@ public class PgenWriter implements VariantContextWriter {
     private ByteBuffer alleleBuffer;
 
     static {
-        //todo
         System.loadLibrary("pgen");
     }
 
+    // doesn't support phasing (phasing ?)
+    // dosage - ?? fraction of sample that is expressing that allele ?)
+    //
+    // needs to know the number of variants and samples
     public PgenWriter(HtsPath file, long numberOfVariants, int numberOfSamples){
         bookKeepingHandle = createPgenMetadata();
         alleleBuffer = createBuffer(numberOfSamples*2*4); //samples * ploidy * bytes in int32
