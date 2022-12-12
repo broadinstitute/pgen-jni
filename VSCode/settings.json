@@ -1,0 +1,8 @@
+{
+    "java.test.config": {
+        "name": "pgenTestConfiguration",
+        "vmArgs": ["-Djava.library.path=/Users/cnorman/projects/pgen-jni/pgen/build/libs/main/macos"]
+    },
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "java.test.defaultConfig" : "pgenTestConfiguration"
+}

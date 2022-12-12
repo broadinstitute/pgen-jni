@@ -4,9 +4,13 @@
 # Ignore Gradle build output directory
 build
 
-#Ignore .idea directory
+#Ignore .idea and .vscode directories
 .idea
+.vscode
 
 #OSX junk
 *.DS_Store
+
+#Java binary stuff
+pgen/bin
 
