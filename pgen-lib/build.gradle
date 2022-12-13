@@ -12,3 +12,13 @@ library {
     targetMachines = [machines.macOS.x86_64, machines.linux.x86_64]
     targetLinkages = [linkages.static]
  }
+
+ dependencies {
+    // assumes boost 1.80.0 is installed in /usr/local/boost for C++ unit tests
+ }
+
+tasks.withType(CppCompile).configureEach {
+    includes {
+        "/usr/local/boost"
+    }
+}

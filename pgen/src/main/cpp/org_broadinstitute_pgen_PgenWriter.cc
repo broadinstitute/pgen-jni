@@ -91,7 +91,7 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject
     uintptr_t alloc_cacheline_ct_ptr;
     uint32_t max_vrec_len;
 
-    const plink2::PglErr init1Result = plink2::SpgwInitPhase1(  cFilename, //filename
+            const plink2::PglErr init1Result = plink2::SpgwInitPhase1(  cFilename, //filename
                      NULL,  // allele index offsets ( for multi allele)
                      NULL,  // non-ref flags
                      (uint32_t) numberOfVariants, // number of variants
