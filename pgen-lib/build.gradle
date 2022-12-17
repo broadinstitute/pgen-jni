@@ -13,7 +13,12 @@ library {
     targetLinkages = [linkages.static]
  }
 
- dependencies {
+ buildTypes {
+    debug
+    release
+}
+
+dependencies {
     // assumes boost 1.80.0 is installed in /usr/local/boost for C++ unit tests
  }
 

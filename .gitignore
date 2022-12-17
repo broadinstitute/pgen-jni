@@ -14,3 +14,5 @@ build
 #Java binary stuff
 pgen/bin
 
+#pgen-lib CMake stuff
+pgen-lib/cmake-build-debug/
