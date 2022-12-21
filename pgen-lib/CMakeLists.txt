@@ -4,9 +4,13 @@ project(pgen_lib)
 set(CMAKE_CXX_STANDARD 14)
 
 include_directories(src/main/headers)
+include_directories(src/main/public)
 include_directories(/usr/local/boost)
 
 add_executable(pgen_lib
+        src/main/public/pgenIO.h
+        src/main/public/pgenMeta.h
+        src/main/cpp/pgenIO.cc
         /usr/local/boost/boost/test/included/unit_test.hpp
         src/main/cpp/pgenlib_ffi_support.cc
         src/main/cpp/pgenlib_misc.cc

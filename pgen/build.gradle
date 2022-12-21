@@ -12,6 +12,11 @@ repositories {
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
+// java
+// {
+//     toolchain.languageVersion = JavaLanguageVersion.of(8)
+// }
+
 library {
     targetMachines = [machines.macOS.x86_64, machines.linux.x86_64]
 }
@@ -29,6 +34,7 @@ dependencies {
 
     // Use TestNG framework, also requires calling test.useTestNG() below
     testImplementation 'org.testng:testng:7.4.0'
+
 }
 
 // Some compiler configuration

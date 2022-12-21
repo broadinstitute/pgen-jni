@@ -3,7 +3,12 @@
 
 using namespace boost::unit_test;
 
-BOOST_AUTO_TEST_CASE(dummy_test) {
-	// a no-op BOOST test to exercise the gradle C++ unit test task
-	BOOST_TEST(true);
+#include "pgenMeta.h"
+#include "pgenIO.h"
+
+BOOST_AUTO_TEST_CASE(test_open_pgen) {
+    PGEN_META * const pgenMeta = openPgen("test_open_pgen.out", 10, 3);
+    closePgen(pgenMeta);
+
+    BOOST_TEST(true);
 }

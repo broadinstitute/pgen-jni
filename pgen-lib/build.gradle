@@ -11,7 +11,7 @@ plugins {
 library {
     targetMachines = [machines.macOS.x86_64, machines.linux.x86_64]
     targetLinkages = [linkages.static]
- }
+}
 
  buildTypes {
     debug
@@ -20,10 +20,21 @@ library {
 
 dependencies {
     // assumes boost 1.80.0 is installed in /usr/local/boost for C++ unit tests
- }
+}
 
 tasks.withType(CppCompile).configureEach {
     includes {
-        "/usr/local/boost"
-    }
+        ["/usr/local/boost",
+        "${project(':pgen-lib').projectDir}/src/main/public",
+        "${project(':pgen-lib').projectDir}/src/main/headers"]
+     }
 }
+
+unitTest {
+    targetMachines = [machines.linux.x86_64, machines.macOS.x86_64]
+
+    // the cpp-unit-test plugin doesn't seem to know about the dev.nokee.cpp-library plugin, so it has
+    // to be configured with the source explicitly
+    source.from file('src')
+}
+

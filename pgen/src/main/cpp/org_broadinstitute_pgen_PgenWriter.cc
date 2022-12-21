@@ -85,6 +85,8 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject
                                                  jlong numberOfVariants,
                                                  jlong sampleCount,
                                                  jlong bookKeepingHandle){
+
+    // TODO: this needs a corresponding relaseStringUTF8Chars or else it will leak the string
     const char* cFilename = env->GetStringUTFChars(filename, NULL);
     BookKeeping* bookKeepingPtr = (BookKeeping*)bookKeepingHandle;
 
