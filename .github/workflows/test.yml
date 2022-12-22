@@ -1,0 +1,42 @@
+# Github actions workflow to build the Linux components and run Java and native/BOOST tests.
+
+name: Build and Test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java: [ 8, 11, 17 ]
+        experimental: [false]
+      fail-fast: false
+    continue-on-error: ${{ matrix.experimental }}
+    name: Java ${{ matrix.Java }} build and test
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up java ${{ matrix.Java }}
+        uses: actions/setup-java@v2
+        with:
+          java-version: ${{ matrix.Java }}
+          distribution: 'adopt'
+          cache: gradle
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+      - name: Compile with Gradle
+        run: ./gradlew compileJava
+# install plink2
+#      - name: Install plink2
+#        run: scripts/install-samtools.sh
+      - name: Run tests
+        run: ./gradlew test
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-results-${{ matrix.Java }}
+          path: build/reports/tests
+

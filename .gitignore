@@ -15,5 +15,6 @@ build
 pgen/bin
 
 #pgen-lib CMake stuff
-pgen-lib/src/test/cmake-build-debug/
-pgen-lib/src/test/cmake-build-release/
+pgen-lib/cmake-build-debug
+pgen-lib/cmake-build-release
+
