@@ -28,9 +28,8 @@ jobs:
         run: chmod +x gradlew
       - name: Compile with Gradle
         run: ./gradlew compileJava
-# install plink2
-#      - name: Install plink2
-#        run: scripts/install-samtools.sh
+      - name: Install boost and plink2
+        run: scripts/install_dependencies.sh
       - name: Run tests
         run: ./gradlew test
       - name: Upload test results
