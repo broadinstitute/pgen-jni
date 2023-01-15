@@ -2,9 +2,9 @@
 
 #ifndef PGEN_LIB_PGENIO_H
 #define PGEN_LIB_PGENIO_H
-#include "pgenMeta.h"
+#include "pgenContext.h"
 
-PGEN_META *openPgen (const char* cFilename, long numberOfVariants, long sampleCount);
-void closePgen (PGEN_META * const pGenMeta);
+PgenContext *openPgen (const char* cFilename, const long numberOfVariants, const long sampleCount);
+void closePgen (const PgenContext * const pGenMeta);
 
 #endif //PGEN_LIB_PGENIO_H

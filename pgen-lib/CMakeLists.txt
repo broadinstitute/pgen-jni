@@ -14,7 +14,7 @@ include_directories(/usr/local/boost)
 add_executable(pgen_lib
         # headers for the C++ public API (callable by the JNI layer)
         src/main/public/pgenIO.h
-        src/main/public/pgenMeta.h
+        src/main/public/pgenContext.h
 
         # implementation of the C++ public API (callable by the JNI layer)
         src/main/cpp/pgenIO.cc

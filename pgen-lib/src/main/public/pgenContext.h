@@ -1,12 +1,12 @@
 //
 
-#ifndef PGEN_LIB_PGENMETA_H
-#define PGEN_LIB_PGENMETA_H
+#ifndef PGEN_LIB_PGENCONTEXT_H
+#define PGEN_LIB_PGENCONTEXT_H
 
 #include "pgenlib_write.h"
 #include "pgenlib_ffi_support.h"
 
-typedef struct PGEN_META {
+typedef struct PgenContext {
     plink2::STPgenWriter* spgwp;
     uintptr_t alloc_cacheline_ct_ptr;
     uint32_t max_vrec_len;
@@ -17,6 +17,6 @@ typedef struct PGEN_META {
     uintptr_t* dosage_present;
     uint16_t* dosage_main;
 
-} pgenMeta;
+} PgenContext;
 
-#endif //PGEN_LIB_PGENMETA_H
+#endif //PGEN_LIB_PGENCONTEXT_H

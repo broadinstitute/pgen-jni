@@ -1,16 +1,16 @@
-#include "pgenMeta.h"
+#include "pgenContext.h"
 #include "pgenlib_misc.h"
 
-PGEN_META *openPgen (
+PgenContext *openPgen (
         const char* cFilename,
-        long numberOfVariants,
-        long sampleCount) {
-    PGEN_META * const pGenMeta = (PGEN_META*) malloc(sizeof(PGEN_META));
+        const long numberOfVariants,
+        const long sampleCount) {
+    PgenContext * const pGenMeta = static_cast<PgenContext *const>(malloc(sizeof(PgenContext)));
     if (pGenMeta == NULL){
         //todo
     }
 
-    pGenMeta->spgwp = (plink2::STPgenWriter*) malloc(sizeof(plink2::STPgenWriter));
+    pGenMeta->spgwp = static_cast<plink2::STPgenWriter*>(malloc(sizeof(plink2::STPgenWriter)));
     if (pGenMeta->spgwp == NULL){
         //todo
     }
@@ -64,7 +64,7 @@ PGEN_META *openPgen (
     return pGenMeta;
 }
 
-void closePgen(PGEN_META * const pGenMeta) {
+void closePgen(const PgenContext * const pGenMeta) {
     const uint32_t declaredVariantCt = plink2::SpgwGetVariantCt(pGenMeta->spgwp);
     const uint32_t writtenVariantCt = plink2::SpgwGetVidx(pGenMeta->spgwp);
     if ( declaredVariantCt != writtenVariantCt) {
