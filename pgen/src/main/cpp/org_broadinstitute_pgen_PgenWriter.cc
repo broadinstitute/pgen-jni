@@ -1,21 +1,9 @@
 #include "org_broadinstitute_pgen_PgenWriter.h"
 #include "PgenJniUtils.h"
+#include "pgenContext.h"
 #include "pgenlib_write.h"
 #include "pgenlib_ffi_support.h"
 #include <string>
-
-typedef struct BookKeepingStruct {
-    plink2::STPgenWriter* spgwp;
-    uintptr_t alloc_cacheline_ct_ptr;
-    uint32_t max_vrec_len;
-
-    uintptr_t* genovec; //Genotype vector
-    uintptr_t* phasepresent;
-    uintptr_t* phaseinfo;
-    uintptr_t* dosage_present;
-    uint16_t* dosage_main;
-
-} BookKeeping;
 
 static void throwErrorMessage( JNIEnv* env, const char* message ) {
     jclass exceptionClass = env->FindClass("org/broadinstitute/pgen/PgenJniException");
@@ -23,17 +11,21 @@ static void throwErrorMessage( JNIEnv* env, const char* message ) {
 }
 
 JNIEXPORT jlong JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_createPgenMetadata (JNIEnv *env, jclass thisObject){
-    BookKeeping* bookKeepingPtr = (BookKeeping*)malloc(sizeof(BookKeepingStruct));
-    if (bookKeepingPtr == NULL){
-       //todo
-    }
+Java_org_broadinstitute_pgen_PgenWriter_createPgenMetadata (JNIEnv *env, jclass thisObject) {
+//    try {
+        PgenContext* pgenContext = static_cast<PgenContext*>(malloc(sizeof(PgenContext)));
+        if (pgenContext == NULL){
+        //todo
+        }
 
-    bookKeepingPtr->spgwp = (plink2::STPgenWriter*)malloc(sizeof(plink2::STPgenWriter));
-    if (bookKeepingPtr->spgwp == NULL){
-       //todo
-    }
-    return (jlong) bookKeepingPtr;
+        pgenContext->spgwp = static_cast<plink2::STPgenWriter*>(malloc(sizeof(plink2::STPgenWriter)));
+        if (pgenContext->spgwp == NULL){
+            //todo
+        }
+        return (jlong) pgenContext;
+    // } catch (...) {
+
+    // }
 }
 
 //  def __cinit__(self, bytes filename, uint32_t sample_ct,
@@ -84,27 +76,27 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject
                                                  jstring filename,
                                                  jlong numberOfVariants,
                                                  jlong sampleCount,
-                                                 jlong bookKeepingHandle){
+                                                 jlong pgenHandle){
 
     // TODO: this needs a corresponding relaseStringUTF8Chars or else it will leak the string
     const char* cFilename = env->GetStringUTFChars(filename, NULL);
-    BookKeeping* bookKeepingPtr = (BookKeeping*)bookKeepingHandle;
+    PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
 
     uintptr_t alloc_cacheline_ct_ptr;
     uint32_t max_vrec_len;
 
-            const plink2::PglErr init1Result = plink2::SpgwInitPhase1(  cFilename, //filename
-                     NULL,  // allele index offsets ( for multi allele)
-                     NULL,  // non-ref flags
-                     (uint32_t) numberOfVariants, // number of variants
-                     (uint32_t) sampleCount, // sample count
-                      0, // optional max allele count
-                      plink2::kPgenWriteSeparateIndex, //todo PgenWriteMode == kPgenWriteSeparateIndex
-                      plink2::kfPgenGlobal0, //todo- is this right ? type: PgenGlobalFlags phase dosage gflags (genotype?)
-                      0, //  non-ref flags storage
-                      bookKeepingPtr->spgwp , // STPgenWriter * spgwp
-                      &alloc_cacheline_ct_ptr , //  uintptr_t* alloc_cacheline_ct_ptr
-                      &max_vrec_len);  // max vrec len ptr
+    const plink2::PglErr init1Result = plink2::SpgwInitPhase1(  cFilename, //filename
+                NULL,  // allele index offsets ( for multi allele)
+                NULL,  // non-ref flags
+                (uint32_t) numberOfVariants, // number of variants
+                (uint32_t) sampleCount, // sample count
+                0, // optional max allele count
+                plink2::kPgenWriteSeparateIndex, //todo PgenWriteMode == kPgenWriteSeparateIndex
+                plink2::kfPgenGlobal0, //todo- is this right ? type: PgenGlobalFlags phase dosage gflags (genotype?)
+                0, //  non-ref flags storage
+                pgenContext->spgwp , // STPgenWriter * spgwp
+                &alloc_cacheline_ct_ptr , //  uintptr_t* alloc_cacheline_ct_ptr
+                &max_vrec_len);  // max vrec len ptr
 
     uint32_t bitvec_cacheline_ct = plink2::DivUp(sampleCount, plink2::kBitsPerCacheline);
 
@@ -129,12 +121,12 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject
     //        self._dosage_present = <uintptr_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct + 2 * bitvec_cacheline_ct) * kCacheline]))
     //        self._dosage_main = <uint16_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct + 3 * bitvec_cacheline_ct) * kCacheline]))
     //        return
-    SpgwInitPhase2(max_vrec_len, bookKeepingPtr->spgwp, spgw_alloc);
-    bookKeepingPtr->genovec = (uintptr_t*)(&(spgw_alloc[alloc_cacheline_ct_ptr * plink2::kCacheline]));
-    bookKeepingPtr->phasepresent = (uintptr_t*)(&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct) * plink2::kCacheline]));
-    bookKeepingPtr->phaseinfo = (uintptr_t*)(&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct + bitvec_cacheline_ct) * plink2::kCacheline]));
-    bookKeepingPtr->dosage_present = (uintptr_t*)(&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct + 2 * bitvec_cacheline_ct) * plink2::kCacheline]));
-    bookKeepingPtr->dosage_main = (uint16_t*)(&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct + 3 * bitvec_cacheline_ct) * plink2::kCacheline]));
+    SpgwInitPhase2(max_vrec_len, pgenContext->spgwp, spgw_alloc);
+    pgenContext->genovec = (uintptr_t*)(&(spgw_alloc[alloc_cacheline_ct_ptr * plink2::kCacheline]));
+    pgenContext->phasepresent = (uintptr_t*)(&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct) * plink2::kCacheline]));
+    pgenContext->phaseinfo = (uintptr_t*)(&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct + bitvec_cacheline_ct) * plink2::kCacheline]));
+    pgenContext->dosage_present = (uintptr_t*)(&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct + 2 * bitvec_cacheline_ct) * plink2::kCacheline]));
+    pgenContext->dosage_main = (uint16_t*)(&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct + 3 * bitvec_cacheline_ct) * plink2::kCacheline]));
     return 0;
 }
 
@@ -153,26 +145,26 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject
 //        return
 JNIEXPORT void JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv* env, jobject object,
-                                                      jlong bookKeepingHandle,
+                                                      jlong pgenHandle,
                                                       jobject alleleBuffer){
     const int32_t* allele_codes = (int32_t*)env->GetDirectBufferAddress(alleleBuffer);
     if ( !allele_codes ) {
         throwErrorMessage(env, "C code can't get address for seqs ByteBuffer");
         return;
     }
-    BookKeeping* bookKeepingPtr = (BookKeeping*)bookKeepingHandle;
-    uintptr_t* genovec = bookKeepingPtr->genovec;
+    PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
+    uintptr_t* genovec = pgenContext->genovec;
     plink2::PglErr reterr;
-    plink2::AlleleCodesToGenoarrUnsafe(allele_codes, NULL, plink2::SpgwGetSampleCt(bookKeepingPtr->spgwp), genovec, NULL, NULL);
-    reterr = plink2::SpgwAppendBiallelicGenovec(genovec, bookKeepingPtr->spgwp);
+    plink2::AlleleCodesToGenoarrUnsafe(allele_codes, NULL, plink2::SpgwGetSampleCt(pgenContext->spgwp), genovec, NULL, NULL);
+    reterr = plink2::SpgwAppendBiallelicGenovec(genovec, pgenContext->spgwp);
     checkPglErr(env, reterr, "Failure while adding genotypes");
 }
 
 JNIEXPORT void JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_closePgen (JNIEnv * env, jobject object, jlong bookKeepingHandle){
-    BookKeeping* bookKeepingPtr = (BookKeeping*)bookKeepingHandle;
-    uint32_t declaredVariantCt = plink2::SpgwGetVariantCt(bookKeepingPtr->spgwp);
-    uint32_t writtenVariantCt = plink2::SpgwGetVidx(bookKeepingPtr->spgwp);
+Java_org_broadinstitute_pgen_PgenWriter_closePgen (JNIEnv * env, jobject object, jlong pgenHandle){
+    PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
+    uint32_t declaredVariantCt = plink2::SpgwGetVariantCt(pgenContext->spgwp);
+    uint32_t writtenVariantCt = plink2::SpgwGetVidx(pgenContext->spgwp);
     if ( declaredVariantCt != writtenVariantCt) {
         char errbuff[200];
         sprintf(errbuff, "PgenWriter.close() called when number of written variants (%d) unequal to initially declared value (%d)", writtenVariantCt, declaredVariantCt);
@@ -181,7 +173,7 @@ Java_org_broadinstitute_pgen_PgenWriter_closePgen (JNIEnv * env, jobject object,
         return;
     }
 
-   checkPglErr(env, SpgwFinish(bookKeepingPtr->spgwp), "Error while closing PgenFile");
+   checkPglErr(env, SpgwFinish(pgenContext->spgwp), "Error while closing PgenFile");
 }
 
 JNIEXPORT jobject JNICALL

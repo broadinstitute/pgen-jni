@@ -8,7 +8,7 @@ import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.writer.VariantContextWriter;
-import htsjdk.variant.vcf.VCFConstants;
+//import htsjdk.variant.vcf.VCFConstants;
 import htsjdk.variant.vcf.VCFHeader;
 
 import java.nio.ByteBuffer;
@@ -21,7 +21,7 @@ import java.util.Map;
 public class PgenWriter implements VariantContextWriter {
 
     public static final int NO_CALL_VALUE = -9;
-    private final long bookKeepingHandle;
+    private final long pgenContextHandle;
     private ByteBuffer alleleBuffer;
 
     static {
@@ -33,11 +33,11 @@ public class PgenWriter implements VariantContextWriter {
     //
     // needs to know the number of variants and samples
     public PgenWriter(HtsPath file, long numberOfVariants, int numberOfSamples){
-        bookKeepingHandle = createPgenMetadata();
+        pgenContextHandle = createPgenMetadata();
         alleleBuffer = createBuffer(numberOfSamples*2*4); //samples * ploidy * bytes in int32
         alleleBuffer.order(ByteOrder.LITTLE_ENDIAN);
 
-        if(openPgen(file.getRawInputString(), numberOfVariants, numberOfSamples, bookKeepingHandle ) != 0){
+        if(openPgen(file.getRawInputString(), numberOfVariants, numberOfSamples, pgenContextHandle ) != 0){
             throw new RuntimeException("failed");
         }
     }
@@ -50,7 +50,7 @@ public class PgenWriter implements VariantContextWriter {
 
     @Override
     public void close() {
-        closePgen(bookKeepingHandle);
+        closePgen(pgenContextHandle);
         destroyByteBuffer(alleleBuffer);
         alleleBuffer = null;
     }
@@ -96,7 +96,7 @@ public class PgenWriter implements VariantContextWriter {
                     "Position: " + alleleBuffer.position() + " Expected " + alleleBuffer.limit());
         }
         alleleBuffer.rewind();
-        appendAlleles(bookKeepingHandle, alleleBuffer);
+        appendAlleles(pgenContextHandle, alleleBuffer);
     }
 
     @Override
@@ -105,10 +105,10 @@ public class PgenWriter implements VariantContextWriter {
     }
 
     private static native long createPgenMetadata();
-    private static native int openPgen(String file, long numberOfVariants, long numberOfSamples, long bookKeepingHandle);
-//    private static native void appendBiallelic(long bookKeepingHandle, )
-    private native void closePgen(long bookKeepingHandle);
-    private native void appendAlleles(long bookKeepingHandle, ByteBuffer alleles);
+    private static native int openPgen(String file, long numberOfVariants, long numberOfSamples, long pgenContextHandle);
+//    private static native void appendBiallelic(long pgenContextHandle, )
+    private native void closePgen(long pgenContextHandle);
+    private native void appendAlleles(long pgenContextHandle, ByteBuffer alleles);
 
     private static native ByteBuffer createBuffer(int length);
     private static native void destroyByteBuffer(ByteBuffer buffer);
