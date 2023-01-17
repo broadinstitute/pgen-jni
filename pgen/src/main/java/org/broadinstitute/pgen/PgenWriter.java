@@ -33,7 +33,7 @@ public class PgenWriter implements VariantContextWriter {
     //
     // needs to know the number of variants and samples
     public PgenWriter(HtsPath file, long numberOfVariants, int numberOfSamples){
-        pgenContextHandle = createPgenMetadata();
+        pgenContextHandle = createPgenContext();
         alleleBuffer = createBuffer(numberOfSamples*2*4); //samples * ploidy * bytes in int32
         alleleBuffer.order(ByteOrder.LITTLE_ENDIAN);
 
@@ -104,7 +104,7 @@ public class PgenWriter implements VariantContextWriter {
 
     }
 
-    private static native long createPgenMetadata();
+    private static native long createPgenContext();
     private static native int openPgen(String file, long numberOfVariants, long numberOfSamples, long pgenContextHandle);
 //    private static native void appendBiallelic(long pgenContextHandle, )
     private native void closePgen(long pgenContextHandle);

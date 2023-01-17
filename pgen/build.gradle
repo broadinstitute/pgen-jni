@@ -46,6 +46,9 @@ tasks.withType(CppCompile).configureEach {
     includes {
         "${project(':pgen-lib').projectDir}/src/main/headers"
     }
+    
+    //establish C++11 as the language version/dialects(s)
+    compilerArgs.add "-std=c++11"
 }
 
 tasks.named('test') {

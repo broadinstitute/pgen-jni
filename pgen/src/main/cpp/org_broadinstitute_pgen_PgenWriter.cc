@@ -11,11 +11,11 @@ static void throwErrorMessage( JNIEnv* env, const char* message ) {
 }
 
 JNIEXPORT jlong JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_createPgenMetadata (JNIEnv *env, jclass thisObject) {
+Java_org_broadinstitute_pgen_PgenWriter_createPgenContext (JNIEnv *env, jclass thisObject) {
 //    try {
         PgenContext* pgenContext = static_cast<PgenContext*>(malloc(sizeof(PgenContext)));
         if (pgenContext == NULL){
-        //todo
+            //todo
         }
 
         pgenContext->spgwp = static_cast<plink2::STPgenWriter*>(malloc(sizeof(plink2::STPgenWriter)));
