@@ -1,31 +1,42 @@
 #include "org_broadinstitute_pgen_PgenWriter.h"
 #include "PgenJniUtils.h"
 #include "pgenContext.h"
+#include "pgenException.h"
 #include "pgenlib_write.h"
 #include "pgenlib_ffi_support.h"
 #include <string>
 
-static void throwErrorMessage( JNIEnv* env, const char* message ) {
+static bool throwErrorMessage( JNIEnv* env, const char* message ) {
     jclass exceptionClass = env->FindClass("org/broadinstitute/pgen/PgenJniException");
-    if ( exceptionClass ) env->ThrowNew(exceptionClass, message);
+    if ( exceptionClass ) {
+        env->ThrowNew(exceptionClass, message);
+        //TODO: what happens after ThrowNew exectues
+    } else {
+        // TODO: ? cerr << e.what() << '\n';
+        fprintf(stderr, "Unable to find java exception class while handling underlying exception: %s", message);
+    }
 }
 
 JNIEXPORT jlong JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_createPgenContext (JNIEnv *env, jclass thisObject) {
-//    try {
+    try {
         PgenContext* pgenContext = static_cast<PgenContext*>(malloc(sizeof(PgenContext)));
         if (pgenContext == NULL){
-            //todo
+            //TODO
         }
 
         pgenContext->spgwp = static_cast<plink2::STPgenWriter*>(malloc(sizeof(plink2::STPgenWriter)));
-        if (pgenContext->spgwp == NULL){
-            //todo
+        if (pgenContext->spgwp == NULL) {
+            //TODO
         }
         return (jlong) pgenContext;
-    // } catch (...) {
-
-    // }
+     } catch (PgenException& e) {
+        // rethrow as a Java exception
+        const bool propagated = throwErrorMessage( env,  e.what());
+        if (!propagated) {
+            throw e;
+        }
+     }
 }
 
 //  def __cinit__(self, bytes filename, uint32_t sample_ct,
