@@ -1,6 +1,3 @@
-
-//TODO: add C98/C++11 compile flags to establish the language version(s)
-
 plugins {
 	id 'dev.nokee.cpp-library'
 	id 'cpp-unit-test'
@@ -31,7 +28,7 @@ tasks.withType(CppCompile).configureEach {
         "${project(':pgen-lib').projectDir}/src/main/public",
         "${project(':pgen-lib').projectDir}/src/main/headers"]
      }
-    //establish C++11 as the language version/dialects(s)
+    //establish C++11 as the language version/dialects
     compilerArgs.add "-std=c++11"
 }
 

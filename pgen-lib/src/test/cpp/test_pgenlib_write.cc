@@ -7,23 +7,20 @@
 
 using namespace boost::unit_test;
 
-//TODO: how to tell BOOST the test failed....
-//TODO: BOOST - failure on exception ?
-
 BOOST_AUTO_TEST_CASE(test_open_pgen) {
     const PgenContext *const pgenContext = openPgen("test_open.pgen", 10, 3);
-    BOOST_TEST(pgenContext != nullptr);
+    BOOST_REQUIRE_NE(pgenContext, nullptr);
     closePgen(pgenContext);
 }
 
-BOOST_AUTO_TEST_CASE(test_pgen_exception_propagation) {
-    char *expectedMessage = "Fake pgen exception";
-    bool isExpectedMessage = true;
-
-    try {
-        throw PgenException(expectedMessage);
-    } catch (PgenException& e) {
-        isExpectedMessage = !strcmp(e.what(), expectedMessage);
-    }
-    BOOST_TEST(isExpectedMessage);
+const char *expectedMessage = "Fake pgen exception";
+bool validateExceptionMessage(PgenException ex) {
+    return !strcmp(ex.what(), expectedMessage);
 }
+BOOST_AUTO_TEST_CASE(test_pgen_exception_propagation) {
+    BOOST_REQUIRE_EXCEPTION(
+            throw PgenException(expectedMessage),
+            PgenException,
+            ::validateExceptionMessage
+    );
+};
