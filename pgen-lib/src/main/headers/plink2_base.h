@@ -1,7 +1,7 @@
 #ifndef __PLINK2_BASE_H__
 #define __PLINK2_BASE_H__
 
-// This library is part of PLINK 2.00, copyright (C) 2005-2022 Shaun Purcell,
+// This library is part of PLINK 2.00, copyright (C) 2005-2023 Shaun Purcell,
 // Christopher Chang.
 //
 // This library is free software: you can redistribute it and/or modify it
@@ -77,6 +77,15 @@
 //   valid input types, NOT counting VecW*.
 
 
+// gcc 8.3.0 has been miscompiling the ParseOnebitUnsafe() function in
+// pgenlib_read.cc for the last several years.  gcc 8.4 does not have this
+// problem, and neither does any other gcc major version I've tested to date.
+#ifndef __clang__
+#  if (__GNUC__ == 8) && (__GNUC_MINOR__ < 4)
+#    error "gcc 8.3 is known to have a miscompilation bug that was fixed in 8.4."
+#  endif
+#endif
+
 #if (__GNUC__ < 4)
 // may eventually add MSVC support to gain access to MKL on Windows, but can't
 // justify doing that before all major features are implemented.
@@ -97,7 +106,7 @@
 // 10000 * major + 100 * minor + patch
 // Exception to CONSTI32, since we want the preprocessor to have access
 // to this value.  Named with all caps as a consequence.
-#define PLINK2_BASE_VERNUM 800
+#define PLINK2_BASE_VERNUM 801
 
 
 #define _FILE_OFFSET_BITS 64
@@ -174,6 +183,10 @@ namespace plink2 {
 #endif
 
 #define UINT32_MAXM1 0xfffffffeU
+
+#ifndef UINT64_MAX
+#  define UINT64_MAX 0xffffffffffffffffLLU
+#endif
 
 #ifdef __cplusplus
 #  define HEADER_INLINE inline
@@ -700,7 +713,7 @@ CONSTI32(kBytesPerVec, 32);
 // However, processor power management, numeric libraries, and my AVX2 code
 // should improve over time.  There will probably come a time where switching
 // to 32-byte fp is worthwhile.
-// #define FVEC_32
+#define FVEC_32
 
 // bleah, have to define these here, vector_size doesn't see enum values
 typedef uintptr_t VecW __attribute__ ((vector_size (32)));
@@ -1522,23 +1535,37 @@ CONSTI32(kVec8thUintPerWord, sizeof(intptr_t) / sizeof(Vec8thUint));
 #    endif
 
 CONSTI32(kBytesPerFVec, 32);
+CONSTI32(kBytesPerDVec, 32);
 typedef float VecF __attribute__ ((vector_size (32)));
+typedef double VecD __attribute__ ((vector_size (32)));
 
 #    define VCONST_F(xx) {xx, xx, xx, xx, xx, xx, xx, xx}
+#    define VCONST_D(xx) {xx, xx, xx, xx}
 
 HEADER_INLINE VecF vecf_setzero() {
   return R_CAST(VecF, _mm256_setzero_ps());
 }
 
+HEADER_INLINE VecD vecd_setzero() {
+  return R_CAST(VecD, _mm256_setzero_pd());
+}
+
 #  else  // !FVEC_32
 
 CONSTI32(kBytesPerFVec, 16);
+CONSTI32(kBytesPerDVec, 16);
 typedef float VecF __attribute__ ((vector_size (16)));
+typedef double VecD __attribute__ ((vector_size (16)));
 
 #    define VCONST_F(xx) {xx, xx, xx, xx}
+#    define VCONST_D(xx) {xx, xx}
 
 HEADER_INLINE VecF vecf_setzero() {
   return R_CAST(VecF, _mm_setzero_ps());
+}
+
+HEADER_INLINE VecD vecd_setzero() {
+  return R_CAST(VecD, _mm_setzero_pd());
 }
 
 #  endif  // !FVEC_32
@@ -1546,6 +1573,7 @@ HEADER_INLINE VecF vecf_setzero() {
 #else  // not __LP64__
 CONSTI32(kBytesPerVec, 4);
 CONSTI32(kBytesPerFVec, 4);
+CONSTI32(kBytesPerDVec, 8);
 CONSTI32(kBitsPerWord, 32);
 CONSTI32(kBitsPerWordLog2, 5);
 
@@ -1555,6 +1583,7 @@ typedef uint8_t Quarterword;
 typedef uintptr_t VecW;
 typedef uintptr_t VecU32;
 typedef float VecF;
+typedef double VecD;
 // VecI16 and VecI8 aren't worth the trouble of scaling down to 32-bit
 
 #  define VCONST_W(xx) (xx)
@@ -1592,15 +1621,6 @@ HEADER_INLINE VecU32 vecu32_and_notfirst(VecU32 excl, VecU32 main) {
   return (~excl) & main;
 }
 #endif  // !__LP64__
-
-// debug
-HEADER_INLINE void PrintVec(const void* vv) {
-  const unsigned char* vv_alias = S_CAST(const unsigned char*, vv);
-  for (uint32_t uii = 0; uii != kBytesPerVec; ++uii) {
-    printf("%u ", vv_alias[uii]);
-  }
-  printf("\n");
-}
 
 // Unfortunately, we need to spell out S_CAST(uintptr_t, 0) instead of just
 // typing k0LU in C99.
@@ -1646,6 +1666,7 @@ CONSTI32(kInt32PerVec, kBytesPerVec / 4);
 CONSTI32(kInt16PerVec, kBytesPerVec / 2);
 
 CONSTI32(kFloatPerFVec, kBytesPerFVec / 4);
+CONSTI32(kDoublePerDVec, kBytesPerDVec / 8);
 
 CONSTI32(kCacheline, 64);
 
@@ -1700,6 +1721,23 @@ CONSTI32(kPglErrstrBufBlen, kPglFnamesize + 256);
 // currently must be power of 2, and multiple of (kBitsPerWord / 2)
 CONSTI32(kPglDifflistGroupSize, 64);
 
+// debug
+HEADER_INLINE void PrintVec(const void* vv) {
+  const unsigned char* vv_alias = S_CAST(const unsigned char*, vv);
+  for (uint32_t uii = 0; uii != kBytesPerVec; ++uii) {
+    printf("%u ", vv_alias[uii]);
+  }
+  printf("\n");
+}
+
+HEADER_INLINE void PrintVecD(const VecD* vv_ptr, const char* preprint) {
+  fputs(preprint, stdout);
+  const double* vv_alias = R_CAST(const double*, vv_ptr);
+  for (uint32_t uii = 0; uii != kDoublePerDVec; ++uii) {
+    printf(" %g", vv_alias[uii]);
+  }
+  fputs("\n", stdout);
+}
 
 #if __cplusplus >= 201103L
 // Main application of std::array in this codebase is enforcing length when
@@ -1774,6 +1812,11 @@ typedef union {
   STD_ARRAY_DECL(float, kFloatPerFVec, f4);
 } UniVecF;
 
+typedef union {
+  VecD vd;
+  STD_ARRAY_DECL(double, kDoublePerDVec, d8);
+} UniVecD;
+
 // sum must fit in 16 bits
 HEADER_INLINE uintptr_t UniVecHsum16(UniVec uv) {
 #ifdef __LP64__
@@ -1812,6 +1855,20 @@ HEADER_INLINE float VecFHsum(VecF vecf) {
 #  endif
 #else
   return uvf.f4[0];
+#endif
+}
+
+HEADER_INLINE double VecDHsum(VecD vecd) {
+  UniVecD uvd;
+  uvd.vd = vecd;
+#ifdef __LP64__
+#  ifdef FVEC_32
+  return uvd.d8[0] + uvd.d8[1] + uvd.d8[2] + uvd.d8[3];
+#  else
+  return uvd.d8[0] + uvd.d8[1];
+#  endif
+#else
+  return uvd.d8[0];
 #endif
 }
 
@@ -3376,6 +3433,8 @@ typedef uint32_t tname
 #else
 #  define GET_PRIVATE(par, member) (par).member
 #endif
+
+static const double kLn2 = 0.6931471805599453;
 
 #ifdef __cplusplus
 }  // namespace plink2

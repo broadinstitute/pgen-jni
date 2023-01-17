@@ -1,4 +1,4 @@
-// This library is part of PLINK 2.00, copyright (C) 2005-2022 Shaun Purcell,
+// This library is part of PLINK 2.00, copyright (C) 2005-2023 Shaun Purcell,
 // Christopher Chang.
 //
 // This library is free software: you can redistribute it and/or modify it
@@ -1405,6 +1405,37 @@ void GenoarrToNonmissingnessUnsafe(const uintptr_t* __restrict genoarr, uint32_t
   for (uint32_t widx = 0; widx != sample_ctl2; ++widx) {
     const uintptr_t cur_geno_word = genoarr[widx];
     nonmissingness_alias[widx] = PackWordToHalfwordMask5555(~(cur_geno_word & (cur_geno_word >> 1)));
+  }
+}
+
+void SparseToMissingness(const uintptr_t* __restrict raregeno, const uint32_t* difflist_sample_ids, uint32_t sample_ct, uint32_t difflist_common_geno, uint32_t difflist_len, uintptr_t* __restrict missingness) {
+  if (difflist_common_geno != 3) {
+    const uint32_t sample_ctl = BitCtToWordCt(sample_ct);
+    ZeroWArr(sample_ctl, missingness);
+    if (!difflist_len) {
+      return;
+    }
+    const uint32_t raregeno_word_ct = NypCtToWordCt(difflist_len);
+    for (uint32_t widx = 0; widx != raregeno_word_ct; ++widx) {
+      const uintptr_t raregeno_word = raregeno[widx];
+      uintptr_t raregeno_11 = raregeno_word & (raregeno_word >> 1) & kMask5555;
+      if (raregeno_11) {
+        const uint32_t* cur_difflist_sample_ids = &(difflist_sample_ids[widx * kBitsPerWordD2]);
+        do {
+          const uint32_t sample_idx_lowbits = ctzw(raregeno_11) / 2;
+          const uint32_t cur_sample_id = cur_difflist_sample_ids[sample_idx_lowbits];
+          SetBit(cur_sample_id, missingness);
+          raregeno_11 &= raregeno_11 - 1;
+        } while (raregeno_11);
+      }
+    }
+  } else {
+    SetAllBits(sample_ct, missingness);
+    // Don't need to look at raregeno, all cases are nonmissing.
+    for (uint32_t uii = 0; uii != difflist_len; ++uii) {
+      const uint32_t cur_sample_id = difflist_sample_ids[uii];
+      ClearBit(cur_sample_id, missingness);
+    }
   }
 }
 

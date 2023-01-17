@@ -1,4 +1,4 @@
-// This library is part of PLINK 2.00, copyright (C) 2005-2022 Shaun Purcell,
+// This library is part of PLINK 2.00, copyright (C) 2005-2023 Shaun Purcell,
 // Christopher Chang.
 //
 // This library is free software: you can redistribute it and/or modify it
@@ -2387,7 +2387,7 @@ PglErr PwcFinish(PgenWriterCommon* pwcp, FILE** pgen_outfile_ptr, FILE** pgi_or_
   unsigned char copybuf[kPglFwriteBlockSize + 3];
   uintptr_t nbyte = fread(copybuf, 1, kPglFwriteBlockSize + 3, *pgen_outfile_ptr);
   if (unlikely((nbyte <= 3) || (!memequal_k(copybuf, "l\x1b\x20", 3)))) {
-    return kPglRetMalformedInput;
+    return kPglRetRewindFail;
   }
   nbyte -= 3;
   if (unlikely(!fwrite_unlocked(&(copybuf[3]), nbyte, 1, header_ff))) {

@@ -1,4 +1,4 @@
-// This library is part of PLINK 2.00, copyright (C) 2005-2022 Shaun Purcell,
+// This library is part of PLINK 2.00, copyright (C) 2005-2023 Shaun Purcell,
 // Christopher Chang.
 //
 // This library is free software: you can redistribute it and/or modify it
@@ -145,7 +145,9 @@ void GenoarrbCountSubsetFreqs(const unsigned char* genoarrb, const uintptr_t* __
         cur_geno_word1 = *genoarrb_iter++;
         cur_geno_word2 = *genoarrb_iter++;
       } else {
-        const uint32_t remaining_byte_ct = NypCtToByteCt(raw_sample_ct) % kBytesPerVec;
+        // bugfix (19 May 2022): this was in 0..31 when it needed to be in
+        // 0..15
+        const uint32_t remaining_byte_ct = NypCtToByteCt(raw_sample_ct) % (kBytesPerVec / 2);
         // todo: check if this harms usual-case loop efficiency
         vechalf_idx = 1;
         if (remaining_byte_ct < kBytesPerWord) {
@@ -8963,7 +8965,8 @@ PglErr PgrGetRaw(uint32_t vidx, PgenGlobalFlags read_gflags, PgenReader* pgr_ptr
     loadbuf_iter = &(loadbuf_iter[dosage_main_aligned_wordct]);
   }
   *loadbuf_iter_ptr = loadbuf_iter;
-  return ParseDosage16(fread_ptr, fread_end, nullptr, raw_sample_ct, vidx, allele_ct, pgrp, nullptr, dphase_present, dphase_delta, nullptr, dosage_present, dosage_main);
+  reterr = ParseDosage16(fread_ptr, fread_end, nullptr, raw_sample_ct, vidx, allele_ct, pgrp, nullptr, dphase_present, dphase_delta, nullptr, dosage_present, dosage_main);
+  return reterr;
 }
 
 
