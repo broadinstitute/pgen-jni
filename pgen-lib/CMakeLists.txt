@@ -37,4 +37,4 @@ add_executable(pgen_lib
 
         # test code
         /usr/local/boost/boost/test/included/unit_test.hpp
-        src/test/cpp/test_pgenlib_write.cc)
+        src/test/cpp/test_pgenlib_write.cc src/main/public/pgenException.h)

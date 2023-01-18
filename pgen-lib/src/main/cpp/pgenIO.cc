@@ -1,4 +1,5 @@
 #include "pgenContext.h"
+#include "pgenException.h"
 #include "pgenlib_misc.h"
 
 PgenContext *openPgen (
@@ -6,13 +7,13 @@ PgenContext *openPgen (
         const long numberOfVariants,
         const long sampleCount) {
     PgenContext * const pGenMeta = static_cast<PgenContext *const>(malloc(sizeof(PgenContext)));
-    if (pGenMeta == NULL){
-        //todo
+    if (pGenMeta == NULL) {
+        throw new PgenException("Failure allocating PgenContext");
     }
 
     pGenMeta->spgwp = static_cast<plink2::STPgenWriter*>(malloc(sizeof(plink2::STPgenWriter)));
     if (pGenMeta->spgwp == NULL){
-        //todo
+        throw new PgenException("Failure allocating STPgenWriter");
     }
 
     uintptr_t alloc_cacheline_ct_ptr;
@@ -44,7 +45,8 @@ PgenContext *openPgen (
 
     unsigned char* spgw_alloc;
     if (plink2::cachealigned_malloc((alloc_cacheline_ct_ptr + genovec_cacheline_ct + 3 * bitvec_cacheline_ct + dosage_main_cacheline_ct) * plink2::kCacheline, &spgw_alloc)){
-        //todo handle malloc fail
+        //TODO: what is this thing that failed ???
+        throw new PgenException("Failure allocating ??");
     }
 
     //        SpgwInitPhase2(max_vrec_len, self._state_ptr, spgw_alloc)
