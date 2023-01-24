@@ -17,11 +17,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+//TODO: get a Java logger, and wrap these methods in try/catch (PgenJniException) and log the error...
 
 public class PgenWriter implements VariantContextWriter {
 
     public static final int NO_CALL_VALUE = -9;
-    private final long pgenContextHandle;
+    private long pgenContextHandle;
     private ByteBuffer alleleBuffer;
 
     static {
@@ -33,24 +34,25 @@ public class PgenWriter implements VariantContextWriter {
     //
     // needs to know the number of variants and samples
     public PgenWriter(HtsPath file, long numberOfVariants, int numberOfSamples){
-        pgenContextHandle = createPgenContext();
+        pgenContextHandle = openPgen(file.getRawInputString(), numberOfVariants, numberOfSamples);
         alleleBuffer = createBuffer(numberOfSamples*2*4); //samples * ploidy * bytes in int32
         alleleBuffer.order(ByteOrder.LITTLE_ENDIAN);
-
-        if(openPgen(file.getRawInputString(), numberOfVariants, numberOfSamples, pgenContextHandle ) != 0){
-            throw new RuntimeException("failed");
-        }
     }
 
     @Override
     public void writeHeader(final VCFHeader header) {
-       // throw new UnsupportedOperationException("PGEN files don't support an independant header write.");
+       throw new UnsupportedOperationException("PGEN writer does not support independent header write.");
     }
 
-
     @Override
+    public void setHeader(final VCFHeader header) {
+        throw new UnsupportedOperationException("PGEN writer does not support independent setHeader");
+   }
+
+   @Override
     public void close() {
         closePgen(pgenContextHandle);
+        pgenContextHandle = 0;
         destroyByteBuffer(alleleBuffer);
         alleleBuffer = null;
     }
@@ -71,7 +73,6 @@ public class PgenWriter implements VariantContextWriter {
         return alleleMap;
     }
 
-
     @Override
     public void add(final VariantContext vc) {
         //reset buffer
@@ -79,7 +80,8 @@ public class PgenWriter implements VariantContextWriter {
         final Map<Allele, Integer> alleleMap = buildAlleleMap(vc);
         for (final Genotype g : vc.getGenotypes()) {
             if (g.getPloidy() != 2) {
-                throw new PgenJniException("PGEN only supports diploid samples and we see one with ploidy = " + g.getPloidy()
+                throw new PgenJniException(
+                    "PGEN only supports diploid samples and we see one with ploidy = " + g.getPloidy()
                         + " at line " + vc.toStringDecodeGenotypes());
             }
             for (final Allele allele : g.getAlleles()) {
@@ -99,14 +101,8 @@ public class PgenWriter implements VariantContextWriter {
         appendAlleles(pgenContextHandle, alleleBuffer);
     }
 
-    @Override
-    public void setHeader(final VCFHeader header) {
-
-    }
-
-    private static native long createPgenContext();
-    private static native int openPgen(String file, long numberOfVariants, long numberOfSamples, long pgenContextHandle);
-//    private static native void appendBiallelic(long pgenContextHandle, )
+    private static native long openPgen(String file, long numberOfVariants, long numberOfSamples);
+    // private static native void appendBiallelic(long pgenContextHandle, )
     private native void closePgen(long pgenContextHandle);
     private native void appendAlleles(long pgenContextHandle, ByteBuffer alleles);
 

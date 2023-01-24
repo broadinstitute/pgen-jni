@@ -1,42 +1,86 @@
 #include "org_broadinstitute_pgen_PgenWriter.h"
+
 #include "PgenJniUtils.h"
+#include "pgenIO.h"
 #include "pgenContext.h"
 #include "pgenException.h"
 #include "pgenlib_write.h"
 #include "pgenlib_ffi_support.h"
-#include <string>
 
-static bool throwErrorMessage( JNIEnv* env, const char* message ) {
-    jclass exceptionClass = env->FindClass("org/broadinstitute/pgen/PgenJniException");
-    if ( exceptionClass ) {
-        env->ThrowNew(exceptionClass, message);
-        //TODO: what happens after ThrowNew exectues
+using namespace pgenlib;
+
+// Implementation of the JNI access layer. In general this code should do as little as possible,
+// only converting to and from Java types, delegating as much as possible to the underlying C++
+// pgenlib code.
+//
+// C++ exceptions from lower layers that are caught here are re-thrown as Java exceptions.
+
+JNIEXPORT jlong JNICALL
+Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject,
+                                                 jstring filename,
+                                                 jlong numberOfVariants,
+                                                 jlong sampleCount) {
+
+    // the plink code makes a copy of filename, so this can be released before this function returns
+    const char* cFilename = env->GetStringUTFChars(filename, nullptr);
+ 
+    jlong pgenHandle;
+    try {
+        PgenContext* pgenContext = openPgen(cFilename, numberOfVariants, sampleCount);
+        env->ReleaseStringUTFChars (filename, cFilename);
+        pgenHandle = reinterpret_cast<jlong>(pgenContext);
+    } catch (PgenException& e) {
+        env->ReleaseStringUTFChars (filename, cFilename);
+        reThrowAsJavaException(env, e, "Native code failure opening pgen context");
+        pgenHandle = 0L;
+    }
+    return pgenHandle;
+}
+
+JNIEXPORT void JNICALL
+Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv* env, jobject object,
+                                                      jlong pgenHandle,
+                                                      jobject alleleBuffer){
+    const int32_t* allele_codes = reinterpret_cast<int32_t*>(env->GetDirectBufferAddress(alleleBuffer));
+    if ( !allele_codes ) {
+        throwJavaException(env, "Native code failure getting address for seqs ByteBuffer");
     } else {
-        // TODO: ? cerr << e.what() << '\n';
-        fprintf(stderr, "Unable to find java exception class while handling underlying exception: %s", message);
+        PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
+        try {
+            appendAlleles(pgenContext, allele_codes);
+        } catch (PgenException& e) {
+            reThrowAsJavaException(env, e, "Native code failure appending alleles");
+        }
     }
 }
 
-JNIEXPORT jlong JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_createPgenContext (JNIEnv *env, jclass thisObject) {
+JNIEXPORT void JNICALL
+Java_org_broadinstitute_pgen_PgenWriter_closePgen (JNIEnv * env, jobject object, jlong pgenHandle){
+    PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
     try {
-        PgenContext* pgenContext = static_cast<PgenContext*>(malloc(sizeof(PgenContext)));
-        if (pgenContext == NULL){
-            //TODO
-        }
+        closePgen(pgenContext);
+    } catch (PgenException& e) {
+        reThrowAsJavaException(env, e, "Native code failure closing pgen context");
+    }
+}
 
-        pgenContext->spgwp = static_cast<plink2::STPgenWriter*>(malloc(sizeof(plink2::STPgenWriter)));
-        if (pgenContext->spgwp == NULL) {
-            //TODO
-        }
-        return (jlong) pgenContext;
-     } catch (PgenException& e) {
-        // rethrow as a Java exception
-        const bool propagated = throwErrorMessage( env,  e.what());
-        if (!propagated) {
-            throw e;
-        }
-     }
+JNIEXPORT jobject JNICALL
+Java_org_broadinstitute_pgen_PgenWriter_createBuffer( JNIEnv* env, jclass cls, jint length ) {
+    void* buf = malloc(length);
+    if ( !buf ) {
+        throwJavaException(env, "Native code failure allocating memory for  buffer");
+        return 0;
+    }
+    return env->NewDirectByteBuffer(buf, length);
+}
+
+JNIEXPORT void JNICALL
+Java_org_broadinstitute_pgen_PgenWriter_destroyByteBuffer( JNIEnv* env, jclass cls, jobject byteBuf ) {
+    void* buf = env->GetDirectBufferAddress(byteBuf);
+    if ( !buf ) {
+        throwJavaException(env, "Native code failure getting ByteBuffer address");
+    }
+    free(buf);
 }
 
 //  def __cinit__(self, bytes filename, uint32_t sample_ct,
@@ -45,7 +89,6 @@ Java_org_broadinstitute_pgen_PgenWriter_createPgenContext (JNIEnv *env, jclass t
 //                  bint hardcall_phase_present = False,
 //                  bint dosage_present = False,
 //                  bint dosage_phase_present = False):
-
 
 //        if dosage_phase_present and not dosage_present:
 //            raise RuntimeError("Invalid arguments for PgenWriter constructor (dosage_phase_present true but dosage_present false).")
@@ -81,66 +124,6 @@ Java_org_broadinstitute_pgen_PgenWriter_createPgenContext (JNIEnv *env, jclass t
 //        cdef uintptr_t alloc_cacheline_ct
 //        cdef uint32_t max_vrec_len
 //        cdef PglErr reterr = SpgwInitPhase1(fname, NULL, self._nonref_flags, variant_ct, sample_ct, 0, phase_dosage_gflags, nonref_flags_storage, self._state_ptr, &alloc_cacheline_ct, &max_vrec_len)
-
-JNIEXPORT jint JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject,
-                                                 jstring filename,
-                                                 jlong numberOfVariants,
-                                                 jlong sampleCount,
-                                                 jlong pgenHandle){
-
-    // TODO: this needs a corresponding relaseStringUTF8Chars or else it will leak the string
-    const char* cFilename = env->GetStringUTFChars(filename, NULL);
-    PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
-
-    uintptr_t alloc_cacheline_ct_ptr;
-    uint32_t max_vrec_len;
-
-    const plink2::PglErr init1Result = plink2::SpgwInitPhase1(  cFilename, //filename
-                NULL,  // allele index offsets ( for multi allele)
-                NULL,  // non-ref flags
-                (uint32_t) numberOfVariants, // number of variants
-                (uint32_t) sampleCount, // sample count
-                0, // optional max allele count
-                plink2::kPgenWriteSeparateIndex, //todo PgenWriteMode == kPgenWriteSeparateIndex
-                plink2::kfPgenGlobal0, //todo- is this right ? type: PgenGlobalFlags phase dosage gflags (genotype?)
-                0, //  non-ref flags storage
-                pgenContext->spgwp , // STPgenWriter * spgwp
-                &alloc_cacheline_ct_ptr , //  uintptr_t* alloc_cacheline_ct_ptr
-                &max_vrec_len);  // max vrec len ptr
-
-    uint32_t bitvec_cacheline_ct = plink2::DivUp(sampleCount, plink2::kBitsPerCacheline);
-
-     //        if reterr != kPglRetSuccess:
-     //            raise RuntimeError("SpgwInitPhase1() error " + str(reterr))
-    checkPglErr(env, init1Result, "Initialization phase 1 failed");
-
-    //        cdef uint32_t genovec_cacheline_ct = DivUp(sample_ct, kNypsPerCacheline)
-    //        cdef uint32_t dosage_main_cacheline_ct = DivUp(sample_ct, (2 * kInt32PerCacheline))
-    uint32_t genovec_cacheline_ct = plink2::DivUp(sampleCount, plink2::kNypsPerCacheline);
-    uint32_t dosage_main_cacheline_ct = plink2::DivUp(sampleCount, (2 * plink2::kInt32PerCacheline));
-
-    unsigned char* spgw_alloc;
-    if (plink2::cachealigned_malloc((alloc_cacheline_ct_ptr + genovec_cacheline_ct + 3 * bitvec_cacheline_ct + dosage_main_cacheline_ct) * plink2::kCacheline, &spgw_alloc)){
-        //todo handle malloc fail
-    }
-
-    //        SpgwInitPhase2(max_vrec_len, self._state_ptr, spgw_alloc)
-    //        self._genovec = <uintptr_t*>(&(spgw_alloc[alloc_cacheline_ct * kCacheline]))
-    //        self._phasepresent = <uintptr_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct) * kCacheline]))
-    //        self._phaseinfo = <uintptr_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct + bitvec_cacheline_ct) * kCacheline]))
-    //        self._dosage_present = <uintptr_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct + 2 * bitvec_cacheline_ct) * kCacheline]))
-    //        self._dosage_main = <uint16_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct + 3 * bitvec_cacheline_ct) * kCacheline]))
-    //        return
-    SpgwInitPhase2(max_vrec_len, pgenContext->spgwp, spgw_alloc);
-    pgenContext->genovec = (uintptr_t*)(&(spgw_alloc[alloc_cacheline_ct_ptr * plink2::kCacheline]));
-    pgenContext->phasepresent = (uintptr_t*)(&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct) * plink2::kCacheline]));
-    pgenContext->phaseinfo = (uintptr_t*)(&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct + bitvec_cacheline_ct) * plink2::kCacheline]));
-    pgenContext->dosage_present = (uintptr_t*)(&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct + 2 * bitvec_cacheline_ct) * plink2::kCacheline]));
-    pgenContext->dosage_main = (uint16_t*)(&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct + 3 * bitvec_cacheline_ct) * plink2::kCacheline]));
-    return 0;
-}
-
 //cpdef append_alleles(self, np.ndarray[np.int32_t,mode="c"] allele_int32, bint all_phased = False):
 //        cdef int32_t* allele_codes = <int32_t*>(&(allele_int32[0]))
 //        cdef uintptr_t* genovec = self._genovec
@@ -154,53 +137,3 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject
 //        if reterr != kPglRetSuccess:
 //            raise RuntimeError("append_alleles() error " + str(reterr))
 //        return
-JNIEXPORT void JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv* env, jobject object,
-                                                      jlong pgenHandle,
-                                                      jobject alleleBuffer){
-    const int32_t* allele_codes = (int32_t*)env->GetDirectBufferAddress(alleleBuffer);
-    if ( !allele_codes ) {
-        throwErrorMessage(env, "C code can't get address for seqs ByteBuffer");
-        return;
-    }
-    PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
-    uintptr_t* genovec = pgenContext->genovec;
-    plink2::PglErr reterr;
-    plink2::AlleleCodesToGenoarrUnsafe(allele_codes, NULL, plink2::SpgwGetSampleCt(pgenContext->spgwp), genovec, NULL, NULL);
-    reterr = plink2::SpgwAppendBiallelicGenovec(genovec, pgenContext->spgwp);
-    checkPglErr(env, reterr, "Failure while adding genotypes");
-}
-
-JNIEXPORT void JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_closePgen (JNIEnv * env, jobject object, jlong pgenHandle){
-    PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
-    uint32_t declaredVariantCt = plink2::SpgwGetVariantCt(pgenContext->spgwp);
-    uint32_t writtenVariantCt = plink2::SpgwGetVidx(pgenContext->spgwp);
-    if ( declaredVariantCt != writtenVariantCt) {
-        char errbuff[200];
-        sprintf(errbuff, "PgenWriter.close() called when number of written variants (%d) unequal to initially declared value (%d)", writtenVariantCt, declaredVariantCt);
-        jclass exceptionClass = env->FindClass("org/broadinstitute/pgen/PgenJniException");
-        env->ThrowNew(exceptionClass, errbuff);
-        return;
-    }
-
-   checkPglErr(env, SpgwFinish(pgenContext->spgwp), "Error while closing PgenFile");
-}
-
-JNIEXPORT jobject JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_createBuffer( JNIEnv* env, jclass cls, jint length ) {
-    void* buf = malloc(length);
-    if ( !buf ) {
-        throwErrorMessage(env, "C code can't allocate memory for  buffer");
-        return 0;
-    }
-    return env->NewDirectByteBuffer(buf, length);
-}
-
-JNIEXPORT void JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_destroyByteBuffer( JNIEnv* env, jclass cls, jobject byteBuf ) {
-    void* buf = env->GetDirectBufferAddress(byteBuf);
-    if ( !buf ) throwErrorMessage(env, "C code can't get ByteBuffer address");
-    free(buf);
-}
-

@@ -15,6 +15,8 @@ add_executable(pgen_lib
         # headers for the C++ public API (callable by the JNI layer)
         src/main/public/pgenIO.h
         src/main/public/pgenContext.h
+        src/main/public/pgenException.h
+        src/main/public/pgenUtils.h
 
         # implementation of the C++ public API (callable by the JNI layer)
         src/main/cpp/pgenIO.cc
@@ -37,4 +39,4 @@ add_executable(pgen_lib
 
         # test code
         /usr/local/boost/boost/test/included/unit_test.hpp
-        src/test/cpp/test_pgenlib_write.cc src/main/public/pgenException.h)
+        src/test/cpp/test_pgenlib_write.cc)

@@ -6,17 +6,20 @@
 #include "pgenlib_write.h"
 #include "pgenlib_ffi_support.h"
 
-typedef struct PgenContext {
-    plink2::STPgenWriter* spgwp;
-    uintptr_t alloc_cacheline_ct_ptr;
-    uint32_t max_vrec_len;
+namespace pgenlib {
 
-    uintptr_t* genovec; //Genotype vector
-    uintptr_t* phasepresent;
-    uintptr_t* phaseinfo;
-    uintptr_t* dosage_present;
-    uint16_t* dosage_main;
+    typedef struct PgenContext {
+        plink2::STPgenWriter* spgwp;
+        uintptr_t alloc_cacheline_ct_ptr;
+        uint32_t max_vrec_len;
 
-} PgenContext;
+        uintptr_t* genovec; //Genotype vector
+        uintptr_t* phasepresent;
+        uintptr_t* phaseinfo;
+        uintptr_t* dosage_present;
+        uint16_t* dosage_main;
 
+    } PgenContext;
+    
+}
 #endif //PGEN_LIB_PGENCONTEXT_H

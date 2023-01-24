@@ -2,16 +2,39 @@
 #define __PGEN_JNI_UTILS__
 
 #include "pgenlib_write.h"
+#include "pgenException.h"
 #include <jni.h>
+#include <iostream>
 
-//Check and throw a java exception if we returned an error.
-void checkPglErr(JNIEnv* env, const plink2::PglErr result, const char* message){
-    if (result){ // PglErr evaluates to true if it was an error
-        jclass myExceptionClass = env->FindClass("org/broadinstitute/pgen/PgenJniException");
-        jstring myErrorJString = env->NewStringUTF(message);
-        jmethodID ctorMethod = env->GetMethodID(myExceptionClass, "<init>", "(Ljava/lang/String;I)V");
-        jthrowable myExceptionObject = (jthrowable)env->NewObject(myExceptionClass, ctorMethod, myErrorJString, (jint)(uint32_t)result);
-        env->Throw(myExceptionObject);
+using namespace pgenlib;
+
+static int ERROR_MESSAGE_BUFFER_SIZE = 1024;
+
+// Throw a Java exception (PgenJniException) with the given error message. Note that control RETURNS
+// to the caller after the exception is thrown.
+static bool throwJavaException( JNIEnv* env, const char* message ) {
+    jclass exceptionClass = env->FindClass("org/broadinstitute/pgen/PgenJniException");
+    bool result = false;
+
+    if ( exceptionClass ) {
+        jint throwResult = env->ThrowNew(exceptionClass, message);
+        if (throwResult < 0) {
+            std::cerr << "Failure throwing Java exception from native code while handling underlying exception caused by: " << message;
+        } else {
+            result = true;
+        }
+    } else {
+        std::cerr << "Unable to find Java exception class while handling underlying exception caused by: " << message;
     }
+    return result;
 }
+
+// Re-throw a PgenException (that originated in underlying *PGENLIB* code) as a Java exception.
+//  Note that control RETURNS to the caller after the exception is thrown.
+static bool reThrowAsJavaException( JNIEnv* env, PgenException& pgenException, const char* context) {
+    //TODO: construct a proper error message using context:
+    //return throwErrorMessage(env, context + " : " + pgenException.what());
+    return throwJavaException(env, pgenException.what());
+}
+
 #endif // __PGEN_JNI_UTILS__

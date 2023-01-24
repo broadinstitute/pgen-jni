@@ -4,18 +4,36 @@
 package org.broadinstitute.pgen;
 
 import htsjdk.io.HtsPath;
-import htsjdk.samtools.util.IOUtil;
 import htsjdk.variant.variantcontext.VariantContext;
-import htsjdk.variant.variantcontext.VariantContextBuilder;
 import htsjdk.variant.vcf.VCFFileReader;
+
+import org.testng.Assert;
 import org.testng.annotations.*;
 
 import java.io.File;
 
-import static org.testng.Assert.*;
-
 public class PgenWriteTest {
-    @Test public void someLibraryMethodReturnsTrue() {
+
+    //TODO: why is this throwing on ppgenIO.cc line (54??)):
+    // unsigned char *spgw_alloc;
+    // if (plink2::cachealigned_malloc(
+    //    (alloc_cacheline_ct_ptr + genovec_cacheline_ct + 3 * bitvec_cacheline_ct + dosage_main_cacheline_ct) *
+    //      plink2::kCacheline, &spgw_alloc)) {
+    //      throw PgenException("Failure allocating ??");
+    //}
+    @SuppressWarnings("unused")
+    @Test(expectedExceptions = PgenJniException.class)
+    public void testExceptionPropagation() {
+        try {
+            // force an exception to be thrown from pgenlib by writing to /dev/null
+            PgenWriter unused = new PgenWriter(new HtsPath("/dev/null"), 6, 3);
+        } catch (final PgenJniException e) {
+            Assert.assertNotNull(e.getMessage());
+            throw e;
+        }
+    }
+
+    @Test public void testWriteVariants() {
         try(VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false)) {
             PgenWriter writer = new PgenWriter(new HtsPath("out.pgen"), 6, 3);
             for (VariantContext vc : reader) {
@@ -24,4 +42,5 @@ public class PgenWriteTest {
             writer.close();
         }
     }
+
 }
