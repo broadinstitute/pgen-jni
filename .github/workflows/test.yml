@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: [ 8, 11, 17 ]
+        java: [ 17 ]
         experimental: [false]
       fail-fast: false
     continue-on-error: ${{ matrix.experimental }}

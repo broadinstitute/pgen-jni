@@ -9,13 +9,8 @@ repositories {
     mavenCentral()
 }
 
-sourceCompatibility = 1.8
-targetCompatibility = 1.8
-
-// java
-// {
-//     toolchain.languageVersion = JavaLanguageVersion.of(8)
-// }
+sourceCompatibility = 1.17
+targetCompatibility = 1.17
 
 library {
     targetMachines = [machines.macOS.x86_64, machines.linux.x86_64]
