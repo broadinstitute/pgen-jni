@@ -24,3 +24,9 @@ RUN cd ${HOME} && \
     mv boost_1_80_0 /usr/local/boost && \
     rm -f boost_1_80_0.tar.gz
 
+# For some reason, the presence of this boost file seems to cause the build of the linux test component (gradle
+# task :pgen-lib:compileTestLinuxCpp) to fail. There are numerous online reports of various products failing to
+# build on ubuntu due to the presence of the same file. There may be a better solution, but removing it seems to
+# work fine for now.
+RUN rm -r /usr/local/boost/libs/wave/test/testwave/testfiles/utf8-test-??????????/
+
