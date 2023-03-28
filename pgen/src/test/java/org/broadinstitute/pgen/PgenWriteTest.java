@@ -35,7 +35,7 @@ public class PgenWriteTest {
 
     @Test public void testWriteVariants() {
         try(VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false)) {
-            PgenWriter writer = new PgenWriter(new HtsPath("out.pgen"), 6, 3);
+            PgenWriter writer = new PgenWriter(new HtsPath("CEUtrioTestToPGEN_pgen-jni.pgen"), 6, 3);
             for (VariantContext vc : reader) {
                 writer.add(vc);
             }

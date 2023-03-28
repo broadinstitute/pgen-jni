@@ -23,15 +23,20 @@ namespace pgenlib {
         uintptr_t alloc_cacheline_ct_ptr;
         uint32_t max_vrec_len;
 
+        //TODO this is using PgenWriteMode kPgenWriteAndCopy for now in order to simplify round trip comparisons
+        // with plink2generated files, but ultimately this mode should be controlled with an arg, with default == kPgenWriteSeparateIndex
         const plink2::PglErr init1Result = plink2::SpgwInitPhase1(cFilename, //filename
                                                                   nullptr,  // allele index offsets ( for multi allele)
                                                                   nullptr,  // non-ref flags
                                                                   (uint32_t) numberOfVariants, // number of variants
                                                                   (uint32_t) sampleCount, // sample count
                                                                   0, // optional max allele count
-                                                                  plink2::kPgenWriteSeparateIndex, //todo PgenWriteMode == kPgenWriteSeparateIndex
+                                                                  //TODO using PgenWriteMode kPgenWriteAndCopy for now to simplify round trip comparisons
+                                                                  // with plink generated files, but ultimately this should be an arg, with
+                                                                  // default == kPgenWriteSeparateIndex
+                                                                  plink2::kPgenWriteAndCopy,
                                                                   plink2::kfPgenGlobal0, //todo- is this right ? type: PgenGlobalFlags phase dosage gflags (genotype?)
-                                                                  0, //  non-ref flags storage
+                                                                  1, //  non-ref flags storage
                                                                   pGenContext->spgwp, // STPgenWriter * spgwp
                                                                   &alloc_cacheline_ct_ptr, //  uintptr_t* alloc_cacheline_ct_ptr
                                                                   &max_vrec_len);  // max vrec len ptr
