@@ -18,15 +18,16 @@ using namespace pgenlib;
 JNIEXPORT jlong JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject,
                                                  jstring filename,
+                                                 jint pgenWriteModeInt,
                                                  jlong numberOfVariants,
-                                                 jlong sampleCount) {
+                                                 jint sampleCount) {
 
     // the plink code makes a copy of filename, so this can be released before this function returns
     const char* cFilename = env->GetStringUTFChars(filename, nullptr);
  
     jlong pgenHandle;
     try {
-        PgenContext* pgenContext = openPgen(cFilename, numberOfVariants, sampleCount);
+        PgenContext* pgenContext = openPgen(cFilename, pgenWriteModeInt, numberOfVariants, sampleCount);
         env->ReleaseStringUTFChars (filename, cFilename);
         pgenHandle = reinterpret_cast<jlong>(pgenContext);
     } catch (PgenException& e) {

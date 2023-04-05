@@ -7,10 +7,15 @@ import htsjdk.io.HtsPath;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFFileReader;
 
+import org.broadinstitute.pgen.TestUtils.PgenFileSet;
 import org.testng.Assert;
 import org.testng.annotations.*;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public class PgenWriteTest {
 
@@ -26,21 +31,60 @@ public class PgenWriteTest {
     public void testExceptionPropagation() {
         try {
             // force an exception to be thrown from pgenlib by writing to /dev/null
-            PgenWriter unused = new PgenWriter(new HtsPath("/dev/null"), 6, 3);
+            PgenWriter unused = new PgenWriter(new HtsPath("/dev/null"), 2, 6, 3);
         } catch (final PgenJniException e) {
             Assert.assertNotNull(e.getMessage());
             throw e;
         }
     }
 
-    @Test public void testWriteVariants() {
-        try(VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false)) {
-            PgenWriter writer = new PgenWriter(new HtsPath("CEUtrioTestToPGEN_pgen-jni.pgen"), 6, 3);
+    //TODO: this test is convenient for debugging but is redundant with the more useful testRoundTripCompareWithPlink2 test below
+    @Test
+    public void testSimpleWriteVariants() throws IOException {
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("test");
+        try (VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false);
+             PgenWriter writer = new PgenWriter(
+                new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
+                2,
+                6,
+                3)) {
             for (VariantContext vc : reader) {
                 writer.add(vc);
             }
-            writer.close();
         }
+
+        final long pgenSize = Files.size(pfs.pGenPath());
+        System.out.println(pgenSize);
+        // for now, just make sure there are contents
+        Assert.assertNotEquals(pgenSize, 0L);
+    }
+
+    @DataProvider(name="roundTripThroughPlink2Provider")
+    public Object[][] roundTripThroughPlink2Provider() {
+        return new Object[][] {
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath() }
+        };
+    }
+
+    @Test(dataProvider = "roundTripThroughPlink2Provider")
+    public void testRoundTripCompareWithPlink2(final Path originalVCF) throws IOException, InterruptedException {
+        // first, convert the test VCF to pgen using the PgenWriter
+        final TestUtils.PgenFileSet jniFileSet = TestUtils.vcfToPgen_jni(originalVCF, 2);
+
+        // now convert the same VCF to pgen using plink2
+        final TestUtils.PgenFileSet plink2FileSet = TestUtils.vcfToPgen_plink2(originalVCF);
+
+        //TODO: for now, propagate the contents of the plink2-generated .pvar and .psam (since we currently don't generate these yet
+        // and plink2 needs them to do the next step)
+        TestUtils.propagatePlink2FileContents(plink2FileSet, jniFileSet);
+
+        // now, use plink2 to reconvert both of the pgens back into VCFs
+        final Path vcfFromPGEN_jni = TestUtils.pgenToVCF_plink2(jniFileSet, "FromJNI");
+        final Path vcfFromPGEN_plink2 = TestUtils.pgenToVCF_plink2(plink2FileSet, "FromPlink2");
+
+        // finally, compare the two round tripped vcfs to see if they're equivalent (note that equivalence doesn't mean they're correct,
+        // only that the our conversion of vcf to pgen is concordant with plink2's)
+        TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, vcfFromPGEN_plink2);
     }
 
 }

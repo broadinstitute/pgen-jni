@@ -6,7 +6,7 @@
 
 namespace pgenlib {
 
-    PgenContext *openPgen(const char *cFilename, const long numberOfVariants, const long sampleCount);
+    PgenContext *openPgen(const char *cFilename, const int pgenWriteModeInt, const long numberOfVariants, const int sampleCount);
     void appendAlleles(const PgenContext *const pGenContext, const int32_t* allele_codes );
     void closePgen(const PgenContext *const pGenContext);
 }

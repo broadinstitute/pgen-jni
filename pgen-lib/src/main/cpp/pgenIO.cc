@@ -1,18 +1,29 @@
+#include <iostream>
+using namespace std;
+
 #include "pgenContext.h"
 #include "pgenException.h"
 #include "pgenUtils.h"
 #include "pgenlib_misc.h"
+#include "pgenlib_write.h"
 
 namespace pgenlib {
 
+    // forward declarations
+    plink2::PgenWriteMode validatePgenWriteMode(const uint32_t anInt);
+
     PgenContext *openPgen(
             const char *cFilename,
+            const int pgenWriteModeInt, // uint32_t to align with the data type of plink2::PgenWriteMode (0, 1, 2)
             const long numberOfVariants,
-            const long sampleCount) {
+            const int sampleCount) {
         PgenContext *const pGenContext = static_cast<PgenContext *const>(malloc(sizeof(PgenContext)));
         if (pGenContext == nullptr) {
             throw PgenException("Native code failure allocating PgenContext");
         }
+
+        // validate the requested pgen write mode
+        plink2::PgenWriteMode pgenWriteMode = validatePgenWriteMode(pgenWriteModeInt);
 
         pGenContext->spgwp = static_cast<plink2::STPgenWriter *>(malloc(sizeof(plink2::STPgenWriter)));
         if (pGenContext->spgwp == nullptr) {
@@ -20,32 +31,27 @@ namespace pgenlib {
             throw PgenException("Native code failure allocating STPgenWriter");
         }
 
-        uintptr_t alloc_cacheline_ct_ptr;
+        uintptr_t alloc_cacheline_ct_ptr = 0;
         uint32_t max_vrec_len;
 
-        //TODO this is using PgenWriteMode kPgenWriteAndCopy for now in order to simplify round trip comparisons
-        // with plink2generated files, but ultimately this mode should be controlled with an arg, with default == kPgenWriteSeparateIndex
         const plink2::PglErr init1Result = plink2::SpgwInitPhase1(cFilename, //filename
                                                                   nullptr,  // allele index offsets ( for multi allele)
                                                                   nullptr,  // non-ref flags
                                                                   (uint32_t) numberOfVariants, // number of variants
                                                                   (uint32_t) sampleCount, // sample count
                                                                   0, // optional max allele count
-                                                                  //TODO using PgenWriteMode kPgenWriteAndCopy for now to simplify round trip comparisons
-                                                                  // with plink generated files, but ultimately this should be an arg, with
-                                                                  // default == kPgenWriteSeparateIndex
-                                                                  plink2::kPgenWriteAndCopy,
+                                                                  pgenWriteMode,
                                                                   plink2::kfPgenGlobal0, //todo- is this right ? type: PgenGlobalFlags phase dosage gflags (genotype?)
                                                                   1, //  non-ref flags storage
                                                                   pGenContext->spgwp, // STPgenWriter * spgwp
                                                                   &alloc_cacheline_ct_ptr, //  uintptr_t* alloc_cacheline_ct_ptr
                                                                   &max_vrec_len);  // max vrec len ptr
-
-        uint32_t bitvec_cacheline_ct = plink2::DivUp(sampleCount, plink2::kBitsPerCacheline);
-
         //        if reterr != kPglRetSuccess:
         //            raise RuntimeError("SpgwInitPhase1() error " + str(reterr))
         //    throwIfPglErr(env, init1Result, "Initialization phase 1 failed");
+        throwOnPglErr(init1Result, "plink2::SpgwInitPhase1 failed");
+
+        uint32_t bitvec_cacheline_ct = plink2::DivUp(sampleCount, plink2::kBitsPerCacheline);
 
         //        cdef uint32_t genovec_cacheline_ct = DivUp(sample_ct, kNypsPerCacheline)
         //        cdef uint32_t dosage_main_cacheline_ct = DivUp(sample_ct, (2 * kInt32PerCacheline))
@@ -99,7 +105,18 @@ namespace pgenlib {
             throw PgenException(reservedForExceptionMessage);
         }
 
+
         throwOnPglErr(SpgwFinish(pGenContext->spgwp), "Error in while closing pgen file");
+        plink2::PglErr cleanupErr;
+        plink2::BoolErr bErr = CleanupSpgw(pGenContext->spgwp, &cleanupErr);
+        if (bErr) {
+            throwOnPglErr(cleanupErr, "Error in while cleaning up pgen file");
+        }
+    }
+
+    plink2::PgenWriteMode validatePgenWriteMode(const uint32_t pgenWriteModeInt) {
+        //TODO: validate this conversion and log error
+        return static_cast<plink2::PgenWriteMode>(pgenWriteModeInt);
     }
 
 }

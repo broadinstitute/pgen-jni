@@ -33,8 +33,8 @@ public class PgenWriter implements VariantContextWriter {
     // dosage - ?? fraction of sample that is expressing that allele ?)
     //
     // needs to know the number of variants and samples
-    public PgenWriter(HtsPath file, long numberOfVariants, int numberOfSamples){
-        pgenContextHandle = openPgen(file.getRawInputString(), numberOfVariants, numberOfSamples);
+    public PgenWriter(HtsPath file, int pgenWriteModeInt, long numberOfVariants, int numberOfSamples){
+        pgenContextHandle = openPgen(file.getRawInputString(), pgenWriteModeInt, numberOfVariants, numberOfSamples);
         alleleBuffer = createBuffer(numberOfSamples*2*4); //samples * ploidy * bytes in int32
         alleleBuffer.order(ByteOrder.LITTLE_ENDIAN);
     }
@@ -78,14 +78,17 @@ public class PgenWriter implements VariantContextWriter {
         //reset buffer
         alleleBuffer.clear();
         final Map<Allele, Integer> alleleMap = buildAlleleMap(vc);
+        System.out.println("\nVariant: " + vc.getContig() + "/" + vc.getStart());
         for (final Genotype g : vc.getGenotypes()) {
             if (g.getPloidy() != 2) {
                 throw new PgenJniException(
                     "PGEN only supports diploid samples and we see one with ploidy = " + g.getPloidy()
                         + " at line " + vc.toStringDecodeGenotypes());
             }
+            System.out.println("  Genotype: " + g.getSampleName());
             for (final Allele allele : g.getAlleles()) {
                 final Integer mapping = alleleMap.get(allele);
+                System.out.println("    Allele: " + allele.getBaseString() + ": " + mapping);
                 try {
                     alleleBuffer.putInt(mapping);
                 } catch (Exception e){
@@ -101,7 +104,7 @@ public class PgenWriter implements VariantContextWriter {
         appendAlleles(pgenContextHandle, alleleBuffer);
     }
 
-    private static native long openPgen(String file, long numberOfVariants, long numberOfSamples);
+    private static native long openPgen(String file, int pgenWriteModeInt, long numberOfVariants, int numberOfSamples);
     // private static native void appendBiallelic(long pgenContextHandle, )
     private native void closePgen(long pgenContextHandle);
     private native void appendAlleles(long pgenContextHandle, ByteBuffer alleles);
