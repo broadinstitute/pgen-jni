@@ -7,7 +7,7 @@
 #include "plink2_base.h"
 
 namespace pgenlib {
-    // reserve some static memory to be used for consructing error messages for exceptions
+    // reserve some static memory to be used for constructing error messages for exceptions
     static constexpr int kReservedMessageBufSize = 1024;
     static char reservedForExceptionMessage[kReservedMessageBufSize];
 
@@ -18,7 +18,8 @@ namespace pgenlib {
 
         public:
             PgenException(const char* message) {
-                this->message = message;
+                // make a copy in our reserved memory, since the caller is probably about to throw...
+                this->message = strncpy(reservedForExceptionMessage, message, 1024);
             }
 
             virtual const char* what() const throw() {
