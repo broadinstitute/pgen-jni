@@ -9,7 +9,6 @@ using namespace std;
 
 namespace pgenlib {
 
-    // forward declarations
     plink2::PgenWriteMode validatePgenWriteMode(const uint32_t anInt);
 
     PgenContext *openPgen(
@@ -46,9 +45,6 @@ namespace pgenlib {
                                                                   pGenContext->spgwp, // STPgenWriter * spgwp
                                                                   &alloc_cacheline_ct_ptr, //  uintptr_t* alloc_cacheline_ct_ptr
                                                                   &max_vrec_len);  // max vrec len ptr
-        //        if reterr != kPglRetSuccess:
-        //            raise RuntimeError("SpgwInitPhase1() error " + str(reterr))
-        //    throwIfPglErr(env, init1Result, "Initialization phase 1 failed");
         throwOnPglErr(init1Result, "plink2::SpgwInitPhase1 failed");
 
         uint32_t bitvec_cacheline_ct = plink2::DivUp(sampleCount, plink2::kBitsPerCacheline);
@@ -90,8 +86,22 @@ namespace pgenlib {
         uintptr_t* genovec = pGenContext->genovec;
         plink2::AlleleCodesToGenoarrUnsafe(allele_codes, nullptr, plink2::SpgwGetSampleCt(pGenContext->spgwp), genovec, nullptr, nullptr);
         plink2::PglErr pglErr = plink2::SpgwAppendBiallelicGenovec(genovec, pGenContext->spgwp);
+        //PglErr SpgwAppendBiallelicGenovecDphase16(
+        // const uintptr_t* __restrict genovec,
+        // const uintptr_t* __restrict phasepresent,
+        // const uintptr_t* __restrict phaseinfo,
+        // const uintptr_t* __restrict dosage_present,
+        // const uintptr_t* dphase_present,
+        // const uint16_t* dosage_main,
+        // const int16_t* dphase_delta,
+        // uint32_t dosage_ct,
+        // uint32_t dphase_ct,
+        // STPgenWriter* spgwp) {
+        //    if (unlikely(SpgwFlush(spgwp))) {
+        //        return kPglRetWriteFail;
+        //    }
         throwOnPglErr(pglErr, "Native code failure adding genotypes");
-    } 
+    }
 
     void closePgen(const PgenContext *const pGenContext) {
         const uint32_t declaredVariantCt = plink2::SpgwGetVariantCt(pGenContext->spgwp);
@@ -115,8 +125,18 @@ namespace pgenlib {
     }
 
     plink2::PgenWriteMode validatePgenWriteMode(const uint32_t pgenWriteModeInt) {
-        //TODO: validate this conversion and log error
-        return static_cast<plink2::PgenWriteMode>(pgenWriteModeInt);
+        switch (pgenWriteModeInt) {
+            case 0:
+            case 1:
+            case 2:
+                return static_cast<plink2::PgenWriteMode>(pgenWriteModeInt);
+
+            default:
+                snprintf(reservedForExceptionMessage,
+                         kReservedMessageBufSize,
+                         "Invalid pgenWriteMode value (%d), must be one of 0, 1, 2", pgenWriteModeInt);
+                throw PgenException(reservedForExceptionMessage);
+        }
     }
 
 }

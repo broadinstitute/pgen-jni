@@ -4,7 +4,10 @@
 package org.broadinstitute.pgen;
 
 import htsjdk.io.HtsPath;
+import htsjdk.variant.variantcontext.Allele;
+import htsjdk.variant.variantcontext.GenotypeBuilder;
 import htsjdk.variant.variantcontext.VariantContext;
+import htsjdk.variant.variantcontext.VariantContextBuilder;
 import htsjdk.variant.vcf.VCFFileReader;
 
 import org.broadinstitute.pgen.TestUtils.PgenFileSet;
@@ -16,75 +19,146 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 
 public class PgenWriteTest {
 
-    //TODO: why is this throwing on ppgenIO.cc line (54??)):
-    // unsigned char *spgw_alloc;
-    // if (plink2::cachealigned_malloc(
-    //    (alloc_cacheline_ct_ptr + genovec_cacheline_ct + 3 * bitvec_cacheline_ct + dosage_main_cacheline_ct) *
-    //      plink2::kCacheline, &spgw_alloc)) {
-    //      throw PgenException("Failure allocating ??");
-    //}
     @SuppressWarnings("unused")
     @Test(expectedExceptions = PgenJniException.class)
     public void testExceptionPropagation() {
         try {
-            // force an exception to be thrown from pgenlib by writing to /dev/null
-            PgenWriter unused = new PgenWriter(new HtsPath("/dev/null"), 2, 6, 3);
+            // force an exception to be thrown from pgen-lib by trying to read from /dev/null
+            final PgenWriter unused = new PgenWriter(new HtsPath("/dev/null"), 2, 6, 3);
         } catch (final PgenJniException e) {
             Assert.assertNotNull(e.getMessage());
             throw e;
         }
     }
 
-    //TODO: this test is convenient for debugging but is redundant with the more useful testRoundTripCompareWithPlink2 test below
+    // this test is redundant with the more useful testRoundTripCompareWithPlink2 test below, but is convenient for debugging...
     @Test
-    public void testSimpleWriteVariants() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("test");
-        try (VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false);
-             PgenWriter writer = new PgenWriter(
+    public void testWritePGENSimple() throws IOException {
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("test", false);
+        try (final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false);
+             final PgenWriter writer = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 2,
                 6,
                 3)) {
-            for (VariantContext vc : reader) {
+            for (final VariantContext vc : reader) {
                 writer.add(vc);
             }
         }
 
-        final long pgenSize = Files.size(pfs.pGenPath());
-        System.out.println(pgenSize);
         // for now, just make sure there are contents
+        final long pgenSize = Files.size(pfs.pGenPath());
         Assert.assertNotEquals(pgenSize, 0L);
     }
 
-    @DataProvider(name="roundTripThroughPlink2Provider")
+    @DataProvider(name="roundTripThroughPlink2Tests")
     public Object[][] roundTripThroughPlink2Provider() {
         return new Object[][] {
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath() }
+            // each file mode, without compression
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 0, false }, // unphased GTs
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 1, false }, // unphased GTs
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 2, false }, // unphased GTs
+
+            // each file mode, with compression
+            // { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 0, true }, // unphased GTs
+            // { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 1, true }, // unphased GTs
+            // { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 2, true }, // unphased GTs
+
+            // phasing not yet implemented
+            //{ Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), 0 } // phased GTs
         };
     }
 
-    @Test(dataProvider = "roundTripThroughPlink2Provider")
-    public void testRoundTripCompareWithPlink2(final Path originalVCF) throws IOException, InterruptedException {
-        // first, convert the test VCF to pgen using the PgenWriter
-        final TestUtils.PgenFileSet jniFileSet = TestUtils.vcfToPgen_jni(originalVCF, 2);
+    @Test(dataProvider = "roundTripThroughPlink2Tests")
+    public void testRoundTripCompareWithPlink2(
+        final Path originalVCF,
+        final int pgenWriteMode,
+        final boolean compressPGEN) throws IOException, InterruptedException {
+ 
+        // first, convert the test VCF to pgen twice, once using the PgenWriter and once using plink2
+        final TestUtils.PgenFileSet jniFileSet = TestUtils.vcfToPgen_jni(originalVCF, pgenWriteMode, compressPGEN);
+        final TestUtils.PgenFileSet plink2FileSet = TestUtils.vcfToPgen_plink2(originalVCF, compressPGEN);
 
-        // now convert the same VCF to pgen using plink2
-        final TestUtils.PgenFileSet plink2FileSet = TestUtils.vcfToPgen_plink2(originalVCF);
-
-        //TODO: for now, propagate the contents of the plink2-generated .pvar and .psam (since we currently don't generate these yet
-        // and plink2 needs them to do the next step)
-        TestUtils.propagatePlink2FileContents(plink2FileSet, jniFileSet);
+        //TODO: remove this when .pvar/.psam writing are implemented
+        // propagate the contents of the plink2-generated .pvar and .psam for now, since generating those isn't implemented
+        // yet, and plink2 needs them to do the round-trip back to VCF)
+        TestUtils.copyPGENCompanionFiles(plink2FileSet, jniFileSet);
 
         // now, use plink2 to reconvert both of the pgens back into VCFs
-        final Path vcfFromPGEN_jni = TestUtils.pgenToVCF_plink2(jniFileSet, "FromJNI");
-        final Path vcfFromPGEN_plink2 = TestUtils.pgenToVCF_plink2(plink2FileSet, "FromPlink2");
+        final Path vcfFromPGEN_jni = TestUtils.pgenToVCF_plink2(jniFileSet, "FromJNI", compressPGEN);
+        final Path vcfFromPGEN_plink2 = TestUtils.pgenToVCF_plink2(plink2FileSet, "FromPlink2", compressPGEN);
 
-        // finally, compare the two round tripped vcfs to see if they're equivalent (note that equivalence doesn't mean they're correct,
-        // only that the our conversion of vcf to pgen is concordant with plink2's)
+        if (pgenWriteMode != 1) {
+            // while we're at it, run plink2 --pgen-diff on the outputs
+            // but only if write mode != kPgenWriteSeparateIndex, since that causes plink2 to say the pgen file is corrupted 
+            TestUtils.validatePgen_plink2(jniFileSet);
+            TestUtils.validatePgen_plink2(plink2FileSet);
+        }
+
+        // also, run a plink2 diff
+        TestUtils.pgenDiff_plink2(jniFileSet, jniFileSet);
+
+        // finally, compare the two round tripped vcfs to see if they're equivalent (note that equivalence doesn't mean they're
+        // correct,  only that the pgen we generated is concordant with plink2's)
         TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, vcfFromPGEN_plink2);
+    }
+
+    @SuppressWarnings("unused")
+    @Test(expectedExceptions = PgenJniException.class)
+    public void testInvalidPGENWriteMode() throws IOException {
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("invalidPGENwriteMode", false);
+        try {
+            // don't use try-with-resources here since if we do we'll get a "no variants written" exception instead
+            final PgenWriter pgenWriter = new PgenWriter(
+                new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
+                4, // must be one of 0, 1, or 2 - 4 is not valid
+                6,
+                3);
+         } catch (final PgenJniException e) {
+            Assert.assertTrue(e.getMessage().contains("Invalid pgenWriteMode value"));
+            throw e;
+         }
+    }
+
+    @Test(expectedExceptions = PgenJniException.class)
+    public void testClosePGENWithNoWrites() throws IOException {
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
+        try (final PgenWriter pgenWriter = new PgenWriter(
+                new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
+                2,
+                6, // claim we'll write 6 variants, but don't write them
+                3)) {
+         } catch (final PgenJniException e) {
+            Assert.assertTrue(e.getMessage().contains("number of written variants"));
+            throw e;
+         }
+    }
+
+    @Test(expectedExceptions = PgenJniException.class)
+    public void testRejectNonDiploid() throws IOException {
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
+        try (final PgenWriter pgenWriter = new PgenWriter(
+                new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
+                2,
+                6,
+                3)) {
+                    final List<Allele> alleles = List.of(
+                        Allele.REF_A, Allele.ALT_C, Allele.ALT_G
+                    );
+                    final VariantContextBuilder vcb = new VariantContextBuilder("test", "chr1", 1, 1, alleles);
+                    final VariantContext ploidy3VC = vcb.genotypes(
+                        List.of(new GenotypeBuilder().name("s1").alleles(alleles).make())
+                    ).make();
+                    Assert.assertEquals(ploidy3VC.getMaxPloidy(2), 3);
+                    pgenWriter.add(ploidy3VC);
+         } catch (final PgenJniException e) {
+            Assert.assertTrue(e.getMessage().contains("ploidy = 3"));
+            throw e;
+         }
     }
 
 }

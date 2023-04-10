@@ -17,8 +17,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-//TODO: get a Java logger, and wrap these methods in try/catch (PgenJniException) and log the error...
-
 public class PgenWriter implements VariantContextWriter {
 
     public static final int NO_CALL_VALUE = -9;
@@ -78,17 +76,17 @@ public class PgenWriter implements VariantContextWriter {
         //reset buffer
         alleleBuffer.clear();
         final Map<Allele, Integer> alleleMap = buildAlleleMap(vc);
-        System.out.println("\nVariant: " + vc.getContig() + "/" + vc.getStart());
+        // System.out.println("\nVariant: " + vc.getContig() + "/" + vc.getStart());
         for (final Genotype g : vc.getGenotypes()) {
             if (g.getPloidy() != 2) {
                 throw new PgenJniException(
                     "PGEN only supports diploid samples and we see one with ploidy = " + g.getPloidy()
                         + " at line " + vc.toStringDecodeGenotypes());
             }
-            System.out.println("  Genotype: " + g.getSampleName());
+            //System.out.println("  Genotype: " + g.getSampleName());
             for (final Allele allele : g.getAlleles()) {
                 final Integer mapping = alleleMap.get(allele);
-                System.out.println("    Allele: " + allele.getBaseString() + ": " + mapping);
+                //System.out.println("    Allele: " + allele.getBaseString() + ": " + mapping);
                 try {
                     alleleBuffer.putInt(mapping);
                 } catch (Exception e){
