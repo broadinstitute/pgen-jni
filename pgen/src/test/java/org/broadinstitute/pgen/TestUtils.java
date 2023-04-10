@@ -92,6 +92,7 @@ public class TestUtils {
             try (final PgenWriter writer = new PgenWriter(
                                                 new HtsPath(pgenFileSet.pGenPath.toAbsolutePath().toString()),
                                                 pgenFileMode,
+                                                PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES,
                                                 vcs.size(),
                                                 nSamples)) {
                 for (final VariantContext vc : vcs) {

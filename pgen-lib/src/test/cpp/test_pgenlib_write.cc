@@ -93,8 +93,9 @@ BOOST_AUTO_TEST_CASE(test_invalid_write_mode) {
     char tmpFileName[TMP_FILENAME_SIZE];
     createTempFile("test_write.pgen", tmpFileName);
     unlink(tmpFileName);
+    const int invalidWriteMode = -2; // must be one of 0, 1, 2
     BOOST_REQUIRE_EXCEPTION(
-            pgenlib::openPgen(tmpFileName, -2, 10L, 3),
+            pgenlib::openPgen(tmpFileName, invalidWriteMode, 10L, 3),
             PgenException,
             [expectedInvalidModeMessage](PgenException ex) -> bool  {
                 return strstr(ex.what(), expectedInvalidModeMessage);

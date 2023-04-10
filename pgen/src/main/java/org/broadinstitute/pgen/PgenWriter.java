@@ -20,18 +20,25 @@ import java.util.Map;
 public class PgenWriter implements VariantContextWriter {
 
     public static final int NO_CALL_VALUE = -9;
+    public static final int MAX_PLINK2_ALTERNATE_ALLELES = 255;
+
     private long pgenContextHandle;
     private ByteBuffer alleleBuffer;
+
+    private int maxAltAlleles = MAX_PLINK2_ALTERNATE_ALLELES;
 
     static {
         System.loadLibrary("pgen");
     }
 
-    // doesn't support phasing (phasing ?)
-    // dosage - ?? fraction of sample that is expressing that allele ?)
-    //
-    // needs to know the number of variants and samples
-    public PgenWriter(HtsPath file, int pgenWriteModeInt, long numberOfVariants, int numberOfSamples){
+    // doesn't preserve phasing
+    public PgenWriter(HtsPath file, int pgenWriteModeInt, int maxAltAlleles, long numberOfVariants, int numberOfSamples) {
+        if (maxAltAlleles > MAX_PLINK2_ALTERNATE_ALLELES) {
+            throw new PgenJniException(
+                String.format("Requested max alternate alleles of (%d) exceeds the supported pgen max of %d", maxAltAlleles, MAX_PLINK2_ALTERNATE_ALLELES));
+        }
+        this.maxAltAlleles = maxAltAlleles;
+
         pgenContextHandle = openPgen(file.getRawInputString(), pgenWriteModeInt, numberOfVariants, numberOfSamples);
         alleleBuffer = createBuffer(numberOfSamples*2*4); //samples * ploidy * bytes in int32
         alleleBuffer.order(ByteOrder.LITTLE_ENDIAN);
@@ -73,9 +80,15 @@ public class PgenWriter implements VariantContextWriter {
 
     @Override
     public void add(final VariantContext vc) {
+        if (!vc.isBiallelic()) {
+            throw new PgenJniException(
+                String.format("Variant has %d alleles - multi-allelic variants are not yet implemented by the pgen-writer", vc.getNAlleles()));
+        }
+
         //reset buffer
         alleleBuffer.clear();
         final Map<Allele, Integer> alleleMap = buildAlleleMap(vc);
+
         // System.out.println("\nVariant: " + vc.getContig() + "/" + vc.getStart());
         for (final Genotype g : vc.getGenotypes()) {
             if (g.getPloidy() != 2) {
