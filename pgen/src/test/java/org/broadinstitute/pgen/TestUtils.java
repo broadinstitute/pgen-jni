@@ -233,7 +233,7 @@ public class TestUtils {
             Assert.assertEquals(actual.getSampleNamesOrderedByName(), expected.getSampleNamesOrderedByName(), "sample names");
             final Set<String> samples = expected.getSampleNames();
             for ( final String sample : samples ) {
-                assertGenotypesAreEqual(actual.getGenotype(sample), expected.getGenotype(sample));
+                assertGenotypesAreEqualIgnorePhasing(actual.getGenotype(sample), expected.getGenotype(sample));
             }
         }
     }
@@ -244,13 +244,15 @@ public class TestUtils {
         Assert.assertTrue(actualSet.equals(expectedSet), info); // note this is necessary due to testng bug for set comps
     }
 
-    // Asserts that the two provided Genotype objects are concordant (not identical, only the same name, alleles and type)
-    public static void assertGenotypesAreEqual(final Genotype actual, final Genotype expected) {
+    // Asserts that the two provided Genotype objects are concordant (not identical, only the same name, alleles and type),
+    // ignores phasing
+    public static void assertGenotypesAreEqualIgnorePhasing(final Genotype actual, final Genotype expected) {
         Assert.assertEquals(actual.getSampleName(), expected.getSampleName(), "Genotype sample names");
-        Assert.assertEquals(actual.getAlleles(), expected.getAlleles(), "Genotype alleles");
-        //phasing differences are caught here...
-        Assert.assertEquals(actual.getGenotypeString(), expected.getGenotypeString(), "Genotype string");
         Assert.assertEquals(actual.getType(), expected.getType(), "Genotype type");
+        // since we don't currently preserve phasing, use sameGenotype(true) to ignore phasing
+        Assert.assertTrue(expected.sameGenotype(actual, true), "Genotype alleles");
+        //also omitted since this is sensitive to phasing
+        //Assert.assertEquals(actual.getGenotypeString(), expected.getGenotypeString(), "Genotype string");
     }
 
      // Creates a temp file that will be deleted on exit after tests are complete.

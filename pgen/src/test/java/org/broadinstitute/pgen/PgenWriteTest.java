@@ -64,13 +64,11 @@ public class PgenWriteTest {
             { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 1, false }, // unphased GTs
             { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 2, false }, // unphased GTs
 
-            // each file mode, with compression
-            // { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 0, true }, // unphased GTs
-            // { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 1, true }, // unphased GTs
-            // { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 2, true }, // unphased GTs
-
-            // phasing not yet implemented
-            //{ Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), 0 } // phased GTs
+            // this file has phased genotypes, but the concordance test ignores phasing for now since
+            // its not preserved by the pgen writer
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), 0, false }, // phased GTs
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), 1, false }, // phased GTs
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), 2, false }  // phased GTs
         };
     }
 
