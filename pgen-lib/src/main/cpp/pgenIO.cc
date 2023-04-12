@@ -13,7 +13,7 @@ namespace pgenlib {
 
     PgenContext *openPgen(
             const char *cFilename,
-            const int pgenWriteModeInt, // uint32_t to align with the data type of plink2::PgenWriteMode (0, 1, 2)
+            const int pgenWriteModeInt,
             const long numberOfVariants,
             const int sampleCount) {
         PgenContext *const pGenContext = static_cast<PgenContext *const>(malloc(sizeof(PgenContext)));
@@ -36,8 +36,8 @@ namespace pgenlib {
         const plink2::PglErr init1Result = plink2::SpgwInitPhase1(cFilename, //filename
                                                                   nullptr,  // allele index offsets ( for multi allele)
                                                                   nullptr,  // non-ref flags
-                                                                  (uint32_t) numberOfVariants, // number of variants
-                                                                  (uint32_t) sampleCount, // sample count
+                                                                  static_cast<uint32_t>(numberOfVariants), // number of variants
+                                                                  static_cast<uint32_t>(sampleCount), // sample count
                                                                   0, // optional max allele count
                                                                   pgenWriteMode,
                                                                   plink2::kfPgenGlobal0, //todo- is this right ? type: PgenGlobalFlags phase dosage gflags (genotype?)
@@ -103,7 +103,6 @@ namespace pgenlib {
                     declaredVariantCt);
             throw PgenException(reservedForExceptionMessage);
         }
-
 
         throwOnPglErr(SpgwFinish(pGenContext->spgwp), "Error closing pgen file: SpgwFinish");
         plink2::PglErr cleanupErr;
