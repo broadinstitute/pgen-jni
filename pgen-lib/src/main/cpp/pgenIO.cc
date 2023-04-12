@@ -69,7 +69,10 @@ namespace pgenlib {
         //        self._dosage_main = <uint16_t*>(&(spgw_alloc[(alloc_cacheline_ct + genovec_cacheline_ct + 3 * bitvec_cacheline_ct) * kCacheline]))
         //        return
         SpgwInitPhase2(max_vrec_len, pGenContext->spgwp, spgw_alloc);
+
+        //TODO: make sure is vector-aligned (the name "genovec" implies that it should be - see pgenlib_misc.h)
         pGenContext->genovec = (uintptr_t *) (&(spgw_alloc[alloc_cacheline_ct_ptr * plink2::kCacheline]));
+
         pGenContext->phasepresent = (uintptr_t *) (&(spgw_alloc[(alloc_cacheline_ct_ptr + genovec_cacheline_ct) *
                                                                 plink2::kCacheline]));
         pGenContext->phaseinfo = (uintptr_t *) (&(spgw_alloc[
@@ -86,20 +89,6 @@ namespace pgenlib {
         uintptr_t* genovec = pGenContext->genovec;
         plink2::AlleleCodesToGenoarrUnsafe(allele_codes, nullptr, plink2::SpgwGetSampleCt(pGenContext->spgwp), genovec, nullptr, nullptr);
         plink2::PglErr pglErr = plink2::SpgwAppendBiallelicGenovec(genovec, pGenContext->spgwp);
-        //PglErr SpgwAppendBiallelicGenovecDphase16(
-        // const uintptr_t* __restrict genovec,
-        // const uintptr_t* __restrict phasepresent,
-        // const uintptr_t* __restrict phaseinfo,
-        // const uintptr_t* __restrict dosage_present,
-        // const uintptr_t* dphase_present,
-        // const uint16_t* dosage_main,
-        // const int16_t* dphase_delta,
-        // uint32_t dosage_ct,
-        // uint32_t dphase_ct,
-        // STPgenWriter* spgwp) {
-        //    if (unlikely(SpgwFlush(spgwp))) {
-        //        return kPglRetWriteFail;
-        //    }
         throwOnPglErr(pglErr, "Native code failure adding genotypes");
     }
 
@@ -116,11 +105,11 @@ namespace pgenlib {
         }
 
 
-        throwOnPglErr(SpgwFinish(pGenContext->spgwp), "Error in while closing pgen file");
+        throwOnPglErr(SpgwFinish(pGenContext->spgwp), "Error closing pgen file: SpgwFinish");
         plink2::PglErr cleanupErr;
         plink2::BoolErr bErr = CleanupSpgw(pGenContext->spgwp, &cleanupErr);
         if (bErr) {
-            throwOnPglErr(cleanupErr, "Error in while cleaning up pgen file");
+            throwOnPglErr(cleanupErr, "Error cleaning up pgen file: CleanupSpgw");
         }
     }
 

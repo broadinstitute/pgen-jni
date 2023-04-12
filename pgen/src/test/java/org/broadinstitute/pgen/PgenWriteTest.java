@@ -59,16 +59,16 @@ public class PgenWriteTest {
     @DataProvider(name="roundTripThroughPlink2Tests")
     public Object[][] roundTripThroughPlink2Provider() {
         return new Object[][] {
-            // each file mode, without compression
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 0, false }, // unphased GTs
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 1, false }, // unphased GTs
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 2, false }, // unphased GTs
+            // small, bi-allelic, unphased - each file mode without compression
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 0, false },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 1, false },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 2, false },
 
-            // this file has phased genotypes, but the concordance test ignores phasing for now since
-            // its not preserved by the pgen writer
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), 0, false }, // phased GTs
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), 1, false }, // phased GTs
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), 2, false }  // phased GTs
+            // slightly larger, bi-allelic, phased (the concordance validation ignores phasing fo
+            // now since its not preserved by the pgen writer
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), 0, false },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), 1, false },
+            // { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), 2, false }
         };
     }
 

@@ -42,7 +42,7 @@ BOOST_AUTO_TEST_CASE(test_pgl_string_conversion) {
 // simple writing of a pGEN file with each possible file write mode
 static const boost::array<int, 3> s_pgenFileMode { 0, 1, 2 };
 BOOST_DATA_TEST_CASE(test_write_pgen, s_pgenFileMode) {
-    const long numberOfVariants = 6L;
+    const long numberOfVariants = 6;
     const int numberOfSamples = 3;
     // one variants's worth of allele codes - 2 alleles over 3 samples
     const int32_t allele_codes[] {0, 0, 0, 0, 0, 0 };

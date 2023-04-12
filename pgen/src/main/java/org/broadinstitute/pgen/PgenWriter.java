@@ -8,9 +8,9 @@ import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.writer.VariantContextWriter;
-//import htsjdk.variant.vcf.VCFConstants;
 import htsjdk.variant.vcf.VCFHeader;
 
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.HashMap;
@@ -89,7 +89,7 @@ public class PgenWriter implements VariantContextWriter {
         alleleBuffer.clear();
         final Map<Allele, Integer> alleleMap = buildAlleleMap(vc);
 
-        // System.out.println("\nVariant: " + vc.getContig() + "/" + vc.getStart());
+        //System.out.println("\nVariant: " + vc.getContig() + "/" + vc.getStart());
         for (final Genotype g : vc.getGenotypes()) {
             if (g.getPloidy() != 2) {
                 throw new PgenJniException(
@@ -102,8 +102,8 @@ public class PgenWriter implements VariantContextWriter {
                 //System.out.println("    Allele: " + allele.getBaseString() + ": " + mapping);
                 try {
                     alleleBuffer.putInt(mapping);
-                } catch (Exception e){
-                    throw new RuntimeException("error while adding value: " + mapping +" for  Allele: " + allele.toString() + " from Genotype: " + g.toString() + " at buffer position: "+ alleleBuffer.position());
+                } catch (BufferOverflowException e){
+                    throw new RuntimeException("Buffer overflow for: " + mapping +" for  Allele: " + allele.toString() + " from Genotype: " + g.toString() + " at buffer position: "+ alleleBuffer.position());
                 }
             }
         }
