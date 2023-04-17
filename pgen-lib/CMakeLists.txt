@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.23)
 # this project is managed by the gradle script and dev.nokee plugins.
 project(pgen_lib)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 11)
 
 include_directories(src/main/headers)
 include_directories(src/main/public)
