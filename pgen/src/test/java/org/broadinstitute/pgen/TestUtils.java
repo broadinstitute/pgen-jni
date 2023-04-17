@@ -114,7 +114,10 @@ public class TestUtils {
      // use plink2 to convert a VCF to PGEN and return the resulting (temporary) files as a PgenFileSet
      public static PgenFileSet vcfToPgen_plink2(final Path originalVCF, final boolean compressPGEN) throws IOException, InterruptedException {
         final PgenFileSet pgenFileSet = PgenFileSet.createTempPgenFileSet("vcfToPgen_plink2", compressPGEN);
-        final String runCommand = String.format("plink2 --vcf %s --make-pgen --out %s", originalVCF.toAbsolutePath(), pgenFileSet.getFileSetPrefix());
+        final String runCommand = String.format(
+            "plink2 --vcf %s --make-pgen --out %s",
+             originalVCF.toAbsolutePath(),
+              pgenFileSet.getFileSetPrefix());
  
         final int cmdResult = executeExternalCommand(runCommand);
         Assert.assertEquals(cmdResult, 0);
@@ -123,7 +126,7 @@ public class TestUtils {
     }
 
    // Use plink2 to convert a PGEN fileset to a temporary vcf
-    public static Path pgenToVCF_plink2(final PgenFileSet pgenFileSet, final String sourceContext, final boolean isCompressed)  throws InterruptedException, IOException {
+    public static Path pgenToVCF_plink2(final PgenFileSet pgenFileSet, final String sourceContext, final boolean isCompressed) throws InterruptedException, IOException {
         final Path plinkGeneratedVCF = createTempFile(pgenFileSet.getFileSetPrefix() + "_" + sourceContext, vcfExtension).toPath();
 
         // the following plink command will create it's own log file, so make sure it gets marked for deletion as well...

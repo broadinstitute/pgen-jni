@@ -118,7 +118,8 @@ public class PgenWriteTest {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
-                PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, // use write and copy mode here so we don't have to clean up the temp file when we abort artificially
+                 // use write and copy mode here so we don't have to clean up the temp file when we abort artificially
+                PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY,
                 PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES,
                 6, // claim we'll write 6 variants, but don't write them
                 3)) {

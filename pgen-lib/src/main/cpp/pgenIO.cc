@@ -12,11 +12,11 @@ namespace pgenlib {
     plink2::PgenWriteMode validatePgenWriteMode(const uint32_t anInt);
 
     PgenContext *openPgen(
-            const char *cFilename,
+            const char* cFilename,
             const int pgenWriteModeInt,
             const long numberOfVariants,
             const int sampleCount) {
-        PgenContext *const pGenContext = static_cast<PgenContext *const>(malloc(sizeof(PgenContext)));
+        PgenContext* const pGenContext = static_cast<PgenContext *const>(malloc(sizeof(PgenContext)));
         if (pGenContext == nullptr) {
             throw PgenException("Native code failure allocating PgenContext");
         }
@@ -54,7 +54,7 @@ namespace pgenlib {
         uint32_t genovec_cacheline_ct = plink2::DivUp(sampleCount, plink2::kNypsPerCacheline);
         uint32_t dosage_main_cacheline_ct = plink2::DivUp(sampleCount, (2 * plink2::kInt32PerCacheline));
 
-        unsigned char *spgw_alloc;
+        unsigned char* spgw_alloc;
         if (plink2::cachealigned_malloc(
                 (alloc_cacheline_ct_ptr + genovec_cacheline_ct + 3 * bitvec_cacheline_ct + dosage_main_cacheline_ct) *
                 plink2::kCacheline, &spgw_alloc)) {

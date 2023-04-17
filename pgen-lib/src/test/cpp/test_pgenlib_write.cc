@@ -13,25 +13,25 @@
 using namespace boost::unit_test;
 using namespace pgenlib;
 
-//******************* Forward Declarations and Constants *******************
+//******************* Forward Declarations/Constants *******************
 constexpr int TMP_FILENAME_SIZE = 4096;
-template<size_t N> void createTempFile(const char *nameTemplate, char (&outputFileName)[N]);
+template<size_t N> void createTempFile(const char* const nameTemplate, char (&outputFileName)[N]);
 long test_write_pgen(
         const long n_variants,
         const int n_samples,
         const int pgen_file_mode,
-        const int32_t *allele_codes);
+        const int32_t* const allele_codes);
 // integer constants to parallel PgenFileMode, for use when calling jni callable functions, which can't
 // use the PgenFileMode enum provided by plink2
 constexpr int PGEN_FILE_MODE_BACKWARD_SEEK = static_cast<int>(plink2::PgenWriteMode::kPgenWriteBackwardSeek);
 constexpr int PGEN_FILE_MODE_WRITE_SEPARATE_INDEX = static_cast<int>(plink2::PgenWriteMode::kPgenWriteSeparateIndex);
 constexpr int PGEN_FILE_MODE_WRITE_AND_COPY = static_cast<int>(plink2::PgenWriteMode::kPgenWriteAndCopy);
 
-//******************* Start Tests *******************
+//******************* Tests *******************
 
 // simple test to exercise throwing/catching of PgenException
 BOOST_AUTO_TEST_CASE(test_pgen_exception_propagation) {
-    const char *expectedPropagationMessage = "Fake pgen exception";
+    const char* const expectedPropagationMessage = "Fake pgen exception";
     BOOST_REQUIRE_EXCEPTION(
             throw PgenException(expectedPropagationMessage),
             PgenException,
@@ -42,7 +42,7 @@ BOOST_AUTO_TEST_CASE(test_pgen_exception_propagation) {
 }
 
 BOOST_AUTO_TEST_CASE(test_pgl_string_conversion) {
-    const char *expectedMessage = "kPglRetNotYetSupported";
+    const char* const expectedMessage = "kPglRetNotYetSupported";
     BOOST_REQUIRE_EXCEPTION(
             throwOnPglErr(plink2::PglErr::ec::kPglRetNotYetSupported, "Testing PglErr conversion"),
             PgenException,
@@ -53,26 +53,26 @@ BOOST_AUTO_TEST_CASE(test_pgl_string_conversion) {
 }
 
 // write a small, bi-allelic pgen file once with each possible file write mode
-static const boost::array<int, 3> s_pgenFileMode {
+static constexpr boost::array<int, 3> s_pgenFileMode {
     PGEN_FILE_MODE_BACKWARD_SEEK,
     PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
     PGEN_FILE_MODE_WRITE_AND_COPY
 };
 BOOST_DATA_TEST_CASE(test_write_biallelic_pgen_small, s_pgenFileMode) {
-    const long n_variants = 6;
-    const int n_samples = 3;
+    constexpr long n_variants = 6;
+    constexpr int n_samples = 3;
     // one variants's worth of allele codes - 2 alleles over 3 samples
-    const int32_t allele_codes[] {0, 0, 0, 0, 0, 0 };
+    constexpr int32_t allele_codes[] {0, 0, 0, 0, 0, 0 };
     test_write_pgen(n_variants, n_samples, sample, allele_codes);
     // ignore the file size, since it varies with the file mode
 }
 
 // write a larger, bi-allelic pgen, using only file mode PGEN_FILE_MODE_WRITE_AND_COPY
 BOOST_AUTO_TEST_CASE(test_write_biallelic_pgen_large) {
-    const long n_variants = 100000L;
-    const int n_samples = 10000;
+    constexpr long n_variants = 100000L;
+    constexpr int n_samples = 10000;
     // one variants's worth of allele codes - 2 alleles over n_samples
-    const int32_t *allele_codes = new int32_t[n_samples * 2];
+    int32_t const *allele_codes = new int32_t[n_samples * 2];
     const long file_size = test_write_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes);
     delete[] allele_codes;
 
@@ -82,7 +82,7 @@ BOOST_AUTO_TEST_CASE(test_write_biallelic_pgen_large) {
 
 // say we're going to write 10 variants, but don't write them
 BOOST_AUTO_TEST_CASE(test_close_pgen_with_no_writes) {
-    const char *expectedNoWriteMessage = "number of written variants";
+    const char* const expectedNoWriteMessage = "number of written variants";
     char tmpFileName[TMP_FILENAME_SIZE];
     createTempFile("test_write.pgen", tmpFileName);
     const pgenlib::PgenContext *const pgenContext = pgenlib::openPgen(
@@ -103,7 +103,7 @@ BOOST_AUTO_TEST_CASE(test_close_pgen_with_no_writes) {
 
 // use a bogus pgen write mode
 BOOST_AUTO_TEST_CASE(test_invalid_write_mode) {
-    const char *expectedInvalidModeMessage = "Invalid pgenWriteMode";
+    const char* const expectedInvalidModeMessage = "Invalid pgenWriteMode";
     char tmpFileName[TMP_FILENAME_SIZE];
     createTempFile("test_write.pgen", tmpFileName);
     unlink(tmpFileName);
@@ -153,7 +153,7 @@ long test_write_pgen(
 // the caller should call unlink() on the resulting file to cause it to be deleted (careful - if its open
 // it will be deleted on close)
 template<size_t N>
-void createTempFile(const char *nameTemplate, char (&outputFileName)[N]) {
+void createTempFile(const char* const nameTemplate, char (&outputFileName)[N]) {
     //this is deprecated (and maybe a little sketchy), but works nicely to obtain a tmp dir location
     std::string tmpPath = std::tmpnam(nullptr);
     snprintf(outputFileName, N, "%s_pgenBoostXXXXXX%s", tmpPath.c_str(), nameTemplate);
