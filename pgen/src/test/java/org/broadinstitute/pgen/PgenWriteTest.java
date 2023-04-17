@@ -153,32 +153,31 @@ public class PgenWriteTest {
          }
     }
 
-    // commented out because VS Code is too dumb to notice that its disabled
-    // // TODO: This test is disabled until we remove the artificial "isBiAllelic" guard that is temporarily in place
-    // // to prevent multi-allelics from being processed, since they aren't yet implemented.
-    // @Test(expectedExceptions = PgenJniException.class, enabled = false)
-    // public void testRejectNonDiploid() throws IOException {
-    //     final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
-    //     try (final PgenWriter pgenWriter = new PgenWriter(
-    //             new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
-    //             PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
-    //             PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES, 
-    //             6,
-    //             3)) {
-    //                 final List<Allele> alleles = List.of(
-    //                     Allele.REF_A, Allele.ALT_C, Allele.ALT_G
-    //                 );
-    //                 final VariantContextBuilder vcb = new VariantContextBuilder("test", "chr1", 1, 1, alleles);
-    //                 final VariantContext ploidy3VC = vcb.genotypes(
-    //                     List.of(new GenotypeBuilder().name("s1").alleles(alleles).make())
-    //                 ).make();
-    //                 Assert.assertEquals(ploidy3VC.getMaxPloidy(2), 3);
-    //                 pgenWriter.add(ploidy3VC);
-    //      } catch (final PgenJniException e) {
-    //         Assert.assertTrue(e.getMessage().contains("ploidy = 3"));
-    //         throw e;
-    //      }
-    // }
+    // TODO: This test is disabled until we remove the artificial "isBiAllelic" guard that is temporarily in place
+    // to prevent multi-allelics from being processed, since they aren't yet implemented.
+    @Test(expectedExceptions = PgenJniException.class, enabled = false)
+    public void testRejectNonDiploid() throws IOException {
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
+        try (final PgenWriter pgenWriter = new PgenWriter(
+                new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
+                PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
+                PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES, 
+                6,
+                3)) {
+                    final List<Allele> alleles = List.of(
+                        Allele.REF_A, Allele.ALT_C, Allele.ALT_G
+                    );
+                    final VariantContextBuilder vcb = new VariantContextBuilder("test", "chr1", 1, 1, alleles);
+                    final VariantContext ploidy3VC = vcb.genotypes(
+                        List.of(new GenotypeBuilder().name("s1").alleles(alleles).make())
+                    ).make();
+                    Assert.assertEquals(ploidy3VC.getMaxPloidy(2), 3);
+                    pgenWriter.add(ploidy3VC);
+         } catch (final PgenJniException e) {
+            Assert.assertTrue(e.getMessage().contains("ploidy = 3"));
+            throw e;
+         }
+    }
 
     @Test(expectedExceptions = PgenJniException.class)
     public void testRequestMaxAltAllelesExceeded() throws IOException {
