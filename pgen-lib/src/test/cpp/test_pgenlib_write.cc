@@ -21,7 +21,8 @@ long test_write_pgen(
         const int n_samples,
         const int pgen_file_mode,
         const int32_t *allele_codes);
-// integer constants to use when calling the jni callable functions, which can't use the PgenFileMode enum provided by plink2
+// integer constants to parallel PgenFileMode, for use when calling jni callable functions, which can't
+// use the PgenFileMode enum provided by plink2
 constexpr int PGEN_FILE_MODE_BACKWARD_SEEK = static_cast<int>(plink2::PgenWriteMode::kPgenWriteBackwardSeek);
 constexpr int PGEN_FILE_MODE_WRITE_SEPARATE_INDEX = static_cast<int>(plink2::PgenWriteMode::kPgenWriteSeparateIndex);
 constexpr int PGEN_FILE_MODE_WRITE_AND_COPY = static_cast<int>(plink2::PgenWriteMode::kPgenWriteAndCopy);

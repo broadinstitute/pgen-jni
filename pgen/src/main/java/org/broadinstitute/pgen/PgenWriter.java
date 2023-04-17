@@ -22,6 +22,20 @@ public class PgenWriter implements VariantContextWriter {
     public static final int NO_CALL_VALUE = -9;
     public static final int MAX_PLINK2_ALTERNATE_ALLELES = 255;
 
+    public enum PgenWriteMode {
+        PGEN_FILE_MODE_BACKWARD_SEEK(0),
+        PGEN_FILE_MODE_WRITE_SEPARATE_INDEX(1),
+        PGEN_FILE_MODE_WRITE_AND_COPY(2); 
+
+        private final int mode;
+        
+        private PgenWriteMode(final int mode) {
+            this.mode = mode;
+        }
+
+        public int value() { return this.mode; }
+    };
+
     private long pgenContextHandle;
     private ByteBuffer alleleBuffer;
 
@@ -32,14 +46,14 @@ public class PgenWriter implements VariantContextWriter {
     }
 
     // doesn't preserve phasing
-    public PgenWriter(HtsPath file, int pgenWriteModeInt, int maxAltAlleles, long numberOfVariants, int numberOfSamples) {
+    public PgenWriter(final HtsPath file, final PgenWriteMode pgenWriteMode, final int maxAltAlleles, final long numberOfVariants, final int numberOfSamples) {
         if (maxAltAlleles > MAX_PLINK2_ALTERNATE_ALLELES) {
             throw new PgenJniException(
                 String.format("Requested max alternate alleles of (%d) exceeds the supported pgen max of %d", maxAltAlleles, MAX_PLINK2_ALTERNATE_ALLELES));
         }
         this.maxAltAlleles = maxAltAlleles;
 
-        pgenContextHandle = openPgen(file.getRawInputString(), pgenWriteModeInt, numberOfVariants, numberOfSamples);
+        pgenContextHandle = openPgen(file.getRawInputString(), pgenWriteMode.value(), numberOfVariants, numberOfSamples);
         alleleBuffer = createBuffer(numberOfSamples*2*4); //samples * ploidy * bytes in int32
         alleleBuffer.order(ByteOrder.LITTLE_ENDIAN);
     }

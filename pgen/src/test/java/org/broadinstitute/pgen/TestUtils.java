@@ -7,11 +7,11 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.broadinstitute.pgen.PgenWriter.PgenWriteMode;
 import org.testng.Assert;
 
 import htsjdk.io.HtsPath;
@@ -76,29 +76,37 @@ public class TestUtils {
            return new PgenFileSet(pGenPath, pVarPath, pSamPath, pLogPath);
         }
     }
+
+    // class/record to hold a metadata for a VCF
+    public record VcfMetaData(long nVariants, int nSamples){};
+ 
+    @SuppressWarnings("unused")
+    public static VcfMetaData getVcfMetaData(final Path vcfPath) {
+        long nVariants = 0L;
+        int nSamples = 0;
+        try (final VCFFileReader vcfReader = new VCFFileReader(vcfPath, false);
+             final CloseableIterator<VariantContext> vcIt = vcfReader.iterator()) {
+            nSamples = vcfReader.getFileHeader().getNGenotypeSamples();
+            nVariants = vcIt.stream().count();
+        }
+        return new VcfMetaData(nVariants, nSamples);
+    }
     
     // use pgen-jni to convert a VCF to PGEN and return the resulting (temporary) files as a PgenFileSet
     public static PgenFileSet vcfToPgen_jni(
             final Path originalVCF,
-            final int pgenFileMode,
+            final PgenWriteMode pgenWriteMode,
             final boolean compressPGEN) throws IOException, InterruptedException {
         final PgenFileSet pgenFileSet = PgenFileSet.createTempPgenFileSet("vcfToPgen_jni", compressPGEN);
-        try(VCFFileReader reader = new VCFFileReader(originalVCF, false)) {
-            final int nSamples = reader.getFileHeader().getNGenotypeSamples();
-            final List<VariantContext> vcs = new ArrayList<>();
-            for (VariantContext vc : reader) {
-                vcs.add(vc);
-            }
-            try (final PgenWriter writer = new PgenWriter(
+        final VcfMetaData vcfMetaData = getVcfMetaData(originalVCF);
+        try(final VCFFileReader reader = new VCFFileReader(originalVCF, false);
+            final PgenWriter writer = new PgenWriter(
                                                 new HtsPath(pgenFileSet.pGenPath.toAbsolutePath().toString()),
-                                                pgenFileMode,
+                                                pgenWriteMode,
                                                 PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES,
-                                                vcs.size(),
-                                                nSamples)) {
-                for (final VariantContext vc : vcs) {
-                    writer.add(vc);
-                }
-            }
+                                                vcfMetaData.nVariants,
+                                                vcfMetaData.nSamples)) {
+            reader.forEach(vc -> writer.add(vc));
         }
         return pgenFileSet;
     }
@@ -114,13 +122,13 @@ public class TestUtils {
         return pgenFileSet;
     }
 
-   // use plink2 to convert a PGEN fileset to a temporary vcf
+   // Use plink2 to convert a PGEN fileset to a temporary vcf
     public static Path pgenToVCF_plink2(final PgenFileSet pgenFileSet, final String sourceContext, final boolean isCompressed)  throws InterruptedException, IOException {
         final Path plinkGeneratedVCF = createTempFile(pgenFileSet.getFileSetPrefix() + "_" + sourceContext, vcfExtension).toPath();
 
         // the following plink command will create it's own log file, so make sure it gets marked for deletion as well...
         makeCompanionLogFileTemporary(plinkGeneratedVCF, vcfExtension);
-
+        
         final String runCommand = String.format(
             "plink2 --pfile %s %s --export vcf --out %s",
             pgenFileSet.getFileSetPrefix(),

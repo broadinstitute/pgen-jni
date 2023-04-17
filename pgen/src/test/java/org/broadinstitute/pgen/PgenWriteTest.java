@@ -10,6 +10,7 @@ import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
 import htsjdk.variant.vcf.VCFFileReader;
 
+import org.broadinstitute.pgen.PgenWriter.PgenWriteMode;
 import org.broadinstitute.pgen.TestUtils.PgenFileSet;
 import org.testng.Assert;
 import org.testng.annotations.*;
@@ -26,11 +27,18 @@ public class PgenWriteTest {
     @SuppressWarnings("unused")
     @Test(expectedExceptions = PgenJniException.class)
     public void testExceptionPropagation() {
+        final File readOnlyFile = TestUtils.createTempFile("pgenReadOnly", ".pgen");
+        readOnlyFile.setReadOnly();
         try {
-            // force an exception to be thrown from pgen-lib by trying to read from /dev/null
-            final PgenWriter unused = new PgenWriter(new HtsPath("/dev/null"), 2, PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES, 6, 3);
+            // force an exception to be thrown from pgen-lib by trying to write to a file that is read only
+            final PgenWriter unused = new PgenWriter(
+                new HtsPath(readOnlyFile.getAbsolutePath()),
+                PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
+                PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES,
+                6,
+                3);
         } catch (final PgenJniException e) {
-            Assert.assertNotNull(e.getMessage());
+            Assert.assertNotNull(e.getMessage().contains("kPglRetOpenFail"));
             throw e;
         }
     }
@@ -39,17 +47,16 @@ public class PgenWriteTest {
     @Test
     public void testWritePGENSimple() throws IOException {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("test", false);
+        final TestUtils.VcfMetaData vcfMetaData = TestUtils.getVcfMetaData(Paths.get("testdata/CEUtrioTest.vcf"));
         try (final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false);
              final PgenWriter writer = new PgenWriter(
-                new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
-                2,
-                PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES,
-                6,
-                3)) {
-            for (final VariantContext vc : reader) {
-                writer.add(vc);
+                    new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
+                    PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
+                    PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES,
+                    vcfMetaData.nVariants(),
+                    vcfMetaData.nSamples())) {
+                reader.forEach(vc -> writer.add(vc));
             }
-        }
 
         // for now, just make sure there are contents
         final long pgenSize = Files.size(pfs.pGenPath());
@@ -60,22 +67,22 @@ public class PgenWriteTest {
     public Object[][] roundTripThroughPlink2Provider() {
         return new Object[][] {
             // small, bi-allelic, unphased - each file mode without compression
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 0, false },
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 1, false },
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), 2, false },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, false },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, false },
 
             // slightly larger, bi-allelic, phased (the concordance validation ignores phasing fo
             // now since its not preserved by the pgen writer
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), 0, false },
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), 1, false },
-            // { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), 2, false }
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, false },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, false }
         };
     }
 
     @Test(dataProvider = "roundTripThroughPlink2Tests")
     public void testRoundTripCompareWithPlink2(
         final Path originalVCF,
-        final int pgenWriteMode,
+        final PgenWriteMode pgenWriteMode,
         final boolean compressPGEN) throws IOException, InterruptedException {
  
         // first, convert the test VCF to pgen twice, once using the PgenWriter and once using plink2
@@ -91,7 +98,7 @@ public class PgenWriteTest {
         final Path vcfFromPGEN_jni = TestUtils.pgenToVCF_plink2(jniFileSet, "FromJNI", compressPGEN);
         final Path vcfFromPGEN_plink2 = TestUtils.pgenToVCF_plink2(plink2FileSet, "FromPlink2", compressPGEN);
 
-        if (pgenWriteMode != 1) {
+        if (pgenWriteMode != PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX) {
             // while we're at it, run plink2 --pgen-diff on the outputs
             // but only if write mode != kPgenWriteSeparateIndex, since that causes plink2 to say the pgen file is corrupted 
             TestUtils.validatePgen_plink2(jniFileSet);
@@ -106,30 +113,12 @@ public class PgenWriteTest {
         TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, vcfFromPGEN_plink2);
     }
 
-    @SuppressWarnings("unused")
-    @Test(expectedExceptions = PgenJniException.class)
-    public void testInvalidPGENWriteMode() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("invalidPGENwriteMode", false);
-        try {
-            // don't use try-with-resources here since if we do we'll get a "no variants written" exception instead
-            final PgenWriter pgenWriter = new PgenWriter(
-                new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
-                4, // must be one of 0, 1, or 2: 4 is not valid
-                PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES, 
-                6,
-                3);
-         } catch (final PgenJniException e) {
-            Assert.assertTrue(e.getMessage().contains("Invalid pgenWriteMode value"));
-            throw e;
-         }
-    }
-
-    @Test(expectedExceptions = PgenJniException.class)
+   @Test(expectedExceptions = PgenJniException.class)
     public void testClosePGENWithNoWrites() throws IOException {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
-                1, // use write mode == 1 here so we don't have to clean up the temp file when we abort artificially
+                PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, // use write and copy mode here so we don't have to clean up the temp file when we abort artificially
                 PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES,
                 6, // claim we'll write 6 variants, but don't write them
                 3)) {
@@ -140,11 +129,11 @@ public class PgenWriteTest {
     }
 
      @Test(expectedExceptions = PgenJniException.class)
-    public void testTemporarilyRejectMultiAllelc() throws IOException {
+    public void testTemporarilyRejectMultiAllelic() throws IOException {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
-                2,
+                PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
                 PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES, 
                 6,
                 3)) {
@@ -163,7 +152,7 @@ public class PgenWriteTest {
          }
     }
 
-    // commented out becuase VS Code is too dumb to notice that its disabled
+    // commented out because VS Code is too dumb to notice that its disabled
     // // TODO: This test is disabled until we remove the artificial "isBiAllelic" guard that is temporarily in place
     // // to prevent multi-allelics from being processed, since they aren't yet implemented.
     // @Test(expectedExceptions = PgenJniException.class, enabled = false)
@@ -171,7 +160,7 @@ public class PgenWriteTest {
     //     final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
     //     try (final PgenWriter pgenWriter = new PgenWriter(
     //             new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
-    //             2,
+    //             PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
     //             PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES, 
     //             6,
     //             3)) {
@@ -195,7 +184,7 @@ public class PgenWriteTest {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
-                2,
+                PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
                 PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES + 1, 
                 6,
                 3)) {
