@@ -253,7 +253,8 @@ PglErr SpgwInitPhase1(const char* __restrict fname, const uintptr_t* __restrict 
   }
   if (max_alt_ct_p1 > 2) {
     // see comments in middle of MpgwInitPhase1()
-    max_vrec_len += 2 + sizeof(AlleleCode) + GetAux1bAlleleEntryByteCt(max_alt_ct_p1, sample_ct - 1);
+    // bugfix (29 Mar 2023): forgot (sample_ct + 6) / 8 term
+    max_vrec_len += 2 + sizeof(AlleleCode) + (sample_ct + 6) / 8 + GetAux1bAlleleEntryByteCt(max_alt_ct_p1, sample_ct - 1);
     // try to permit uncompressed records to be larger than this, only error
     // out when trying to write a larger compressed record.
   }
@@ -2403,7 +2404,8 @@ PglErr PwcFinish(PgenWriterCommon* pwcp, FILE** pgen_outfile_ptr, FILE** pgi_or_
     }
   }
   if (unlikely(fclose_null(pgen_outfile_ptr) ||
-               unlink(*fname_buf_ptr))) {
+               unlink(*fname_buf_ptr) ||
+               fclose_null(header_ff_ptr))) {
     return kPglRetWriteFail;
   }
   free(*fname_buf_ptr);

@@ -1,7 +1,7 @@
 The plink-ng source in this repo is from plink-ng commit:
 
-commit c18bc77ea2a5fde71442b83a2f46b66f80563ac1
+commit a01b2fcde9563dfbe5175a2b33c301d91aefaa99
 Author: Christopher Chang <chrchang523@gmail.com>
-Date:   Mon Jan 16 21:29:52 2023 -0800
+Date:   Mon Apr 17 20:22:46 2023 -0700
 
-    dev rebuild
+    partial Python multiallelic-variant support, multiallelic mixed-phase loading bugfix

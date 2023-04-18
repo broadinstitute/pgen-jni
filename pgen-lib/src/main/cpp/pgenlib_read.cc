@@ -6874,6 +6874,8 @@ PglErr PgrGetMP(const uintptr_t* __restrict sample_include, PgrSampleSubsetIndex
   uintptr_t* all_hets = VrtypeHphase(vrtype)? pgrp->workspace_all_hets : nullptr;
   PglErr reterr = GetMultiallelicCodes(sample_include, sample_include_cumulative_popcounts, sample_ct, vidx, pgrp, all_hets? (&fread_ptr) : nullptr, all_hets? (&fread_end) : nullptr, all_hets, pgvp);
   if (reterr || (!all_hets)) {
+    // bugfix (17 Apr 2023): need to zero out phasepresent_ct in this case
+    pgvp->phasepresent_ct = 0;
     return reterr;
   }
   const uint32_t raw_sample_ct = pgrp->fi.raw_sample_ct;
@@ -7021,7 +7023,9 @@ PglErr ParseDosage16(const unsigned char* fread_ptr, const unsigned char* fread_
       // todo: multiallelic dosage
       // need to support downcode to ref/nonref as well as raw load
       // (dosage_ct_ptr should be nullptr iff we're doing a raw load)
+#ifndef PGENLIB_NOPRINT
       fputs("multiallelic variants not yet supported by ParseDosage16()\n", stderr);
+#endif
       return kPglRetNotYetSupported;
     }
     if (dphase_ct_ptr) {
@@ -7130,7 +7134,9 @@ PglErr ParseDosage16(const unsigned char* fread_ptr, const unsigned char* fread_
       }
     } else {
       // multiallelic subcase
+#ifndef PGENLIB_NOPRINT
       fputs("multiallelic variants not yet supported by ParseDosage16()\n", stderr);
+#endif
       return kPglRetNotYetSupported;
     }
   }
@@ -7182,7 +7188,9 @@ PglErr PgrGet1D(const uintptr_t* __restrict sample_include, PgrSampleSubsetIndex
     *dosage_ct_ptr = 0;
     return IMPLPgrGet1(sample_include, sample_include_cumulative_popcounts, sample_ct, vidx, allele_idx, pgrp, allele_countvec);
   }
+#ifndef PGENLIB_NOPRINT
   fputs("multiallelic variants not yet supported by PgrGet1D()\n", stderr);
+#endif
   return kPglRetNotYetSupported;
 }
 
@@ -7208,7 +7216,9 @@ PglErr PgrGetInv1D(const uintptr_t* __restrict sample_include, PgrSampleSubsetIn
     *dosage_ct_ptr = 0;
     return IMPLPgrGetInv1(sample_include, sample_include_cumulative_popcounts, sample_ct, vidx, allele_idx, pgrp, allele_invcountvec);
   }
+#ifndef PGENLIB_NOPRINT
   fputs("multiallelic variants not yet supported by PgrGetInv1D()\n", stderr);
+#endif
   return kPglRetNotYetSupported;
 }
 
@@ -7533,7 +7543,9 @@ PglErr GetBasicGenotypeCountsAndDosage16s(const uintptr_t* __restrict sample_inc
   if (allele_ct != 2) {
     // Maybe make this an invalid function call?  If that happens, the
     // VrtypeMultiallelicHc() branch above can be removed.
+#ifndef PGENLIB_NOPRINT
     fputs("multiallelic dosages not yet supported by GetBasicGenotypeCountsAndDosage16s()\n", stderr);
+#endif
     return kPglRetNotYetSupported;
   }
 
@@ -8576,7 +8588,9 @@ PglErr GetMultiallelicCountsAndDosage16s(const uintptr_t* __restrict sample_incl
     }
     return kPglRetSuccess;
   }
+#ifndef PGENLIB_NOPRINT
   fputs("dosages not yet supported by GetMultiallelicCountsAndDosage16s()\n", stderr);
+#endif
   return kPglRetNotYetSupported;
 }
 
@@ -8631,7 +8645,9 @@ PglErr PgrGetMD(const uintptr_t* __restrict sample_include, PgrSampleSubsetIndex
   } else {
     // todo: ReadRawGenovec, etc.
   }
+#ifndef PGENLIB_NOPRINT
   fputs("true multiallelic dosages not yet supported by PgrGetMD()\n", stderr);
+#endif
   return kPglRetNotYetSupported;
 }
 
@@ -8685,7 +8701,9 @@ PglErr PgrGetInv1Dp(const uintptr_t* __restrict sample_include, PgrSampleSubsetI
     pgvp->dphase_ct = 0;
     return IMPLPgrGetInv1P(sample_include, sample_include_cumulative_popcounts, sample_ct, vidx, allele_idx, pgrp, pgvp->genovec, pgvp->phasepresent, pgvp->phaseinfo, &(pgvp->phasepresent_ct));
   }
+#ifndef PGENLIB_NOPRINT
   fputs("multiallelic dosage not yet supported by GetInv1Dp()\n", stderr);
+#endif
   return kPglRetNotYetSupported;
 }
 
@@ -8714,6 +8732,7 @@ PglErr PgrGetMDp(const uintptr_t* __restrict sample_include, PgrSampleSubsetInde
   if (VrtypeMultiallelicHc(vrtype)) {
     PglErr reterr = GetMultiallelicCodes(sample_include, sample_include_cumulative_popcounts, sample_ct, vidx, pgrp, all_hets? (&fread_ptr) : nullptr, all_hets? (&fread_end) : nullptr, all_hets, pgvp);
     if (reterr || (!all_hets)) {
+      pgvp->phasepresent_ct = 0;
       return reterr;
     }
     if (!(vrtype & 0x60)) {
@@ -8723,7 +8742,9 @@ PglErr PgrGetMDp(const uintptr_t* __restrict sample_include, PgrSampleSubsetInde
   } else {
     // todo: ReadRawGenovec, etc.
   }
+#ifndef PGENLIB_NOPRINT
   fputs("true multiallelic dosages not yet supported by PgrGetMDp()\n", stderr);
+#endif
   return kPglRetNotYetSupported;
 }
 
