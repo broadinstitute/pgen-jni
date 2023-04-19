@@ -126,16 +126,21 @@ public class TestUtils {
     }
 
    // Use plink2 to convert a PGEN fileset to a temporary vcf
-    public static Path pgenToVCF_plink2(final PgenFileSet pgenFileSet, final String sourceContext, final boolean isCompressed) throws InterruptedException, IOException {
+    public static Path pgenToVCF_plink2(
+        final PgenFileSet pgenFileSet,
+        final String sourceContext,
+        final String additionalArgs, // may be null
+        final boolean isCompressed) throws InterruptedException, IOException {
         final Path plinkGeneratedVCF = createTempFile(pgenFileSet.getFileSetPrefix() + "_" + sourceContext, vcfExtension).toPath();
 
         // the following plink command will create it's own log file, so make sure it gets marked for deletion as well...
         makeCompanionLogFileTemporary(plinkGeneratedVCF, vcfExtension);
         
         final String runCommand = String.format(
-            "plink2 --pfile %s %s --export vcf --out %s",
+            "plink2 --pfile %s %s %s --export vcf --out %s",
             pgenFileSet.getFileSetPrefix(),
             getDecompressCommand(pgenFileSet.pGenPath(), isCompressed),
+            additionalArgs == null ? "" : additionalArgs,
             TestUtils.getAbsoluteFileNameWithoutExtension(plinkGeneratedVCF, vcfExtension));
 
         final int cmdResult = executeExternalCommand(runCommand);
@@ -213,10 +218,10 @@ public class TestUtils {
     }
 
     // compare a plink2-generated VCF with a pgen-jni-generated VCF
-    public static void verifyRoundTripGenotypeConcordance(final Path plinkVCF, final Path jniVCF) {
-        try (final VCFFileReader jniReader = new VCFFileReader(jniVCF, false);
+    public static void verifyRoundTripGenotypeConcordance(final Path actualVCF, final Path expectedVCF) {
+        try (final VCFFileReader jniReader = new VCFFileReader(expectedVCF, false);
              final CloseableIterator<VariantContext> jniIt = jniReader.iterator()) {
-            try (final VCFFileReader plinkReader = new VCFFileReader(plinkVCF, false)) {
+            try (final VCFFileReader plinkReader = new VCFFileReader(actualVCF, false)) {
                 for (final VariantContext plinkVariant : plinkReader) {
                     if (!jniIt.hasNext()) {
                         throw new IllegalStateException("No corresponding jni variant for plink variant: " + plinkVariant);

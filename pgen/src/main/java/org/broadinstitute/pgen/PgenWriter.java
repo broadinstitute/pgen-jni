@@ -96,7 +96,9 @@ public class PgenWriter implements VariantContextWriter {
     public void add(final VariantContext vc) {
         if (!vc.isBiallelic()) {
             throw new PgenJniException(
-                String.format("Variant has %d alleles - multi-allelic variants are not yet implemented by the pgen-writer", vc.getNAlleles()));
+                String.format("Variant has %d alleles - multi-allelic variants are not yet implemented by the pgen-writer: %s",
+                 vc.getNAlleles(),
+                 vc.toStringWithoutGenotypes()));
         }
 
         //reset buffer
