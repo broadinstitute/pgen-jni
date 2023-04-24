@@ -73,16 +73,52 @@ BOOST_DATA_TEST_CASE(test_write_biallelic_pgen_small, s_pgenFileMode) {
 BOOST_AUTO_TEST_CASE(test_write_biallelic_pgen_large) {
     constexpr long n_variants = 100000L;
     constexpr int n_samples = 10000;
+    constexpr int n_alleles = 2;
     // one variants's worth of allele codes - 2 alleles over n_samples
     int32_t *allele_codes = new int32_t[n_samples * 2];
-    for (int i = 0; i < n_samples * 2; i++) {
-        allele_codes[i] = 0;
+    for (int i = 0; i < n_samples; i+=2) {
+        allele_codes[i] = rand() % n_alleles;
+        allele_codes[i+1] = rand() % n_alleles;
     }
     const long file_size = test_write_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes);
     delete[] allele_codes;
 
     //TODO: hm - for some reason, the file is 350028 on my Mac, but is 353340 on CI/linux
     //BOOST_REQUIRE_EQUAL(file_size, 350028); // cause thats what it is
+}
+
+// write a larger, bi-allelic pgen, using only file mode PGEN_FILE_MODE_WRITE_AND_COPY
+BOOST_AUTO_TEST_CASE(test_write_multi_allelic_pgen_large) {
+    constexpr long n_variants = 100000L;
+    constexpr int n_samples = 10000;
+    constexpr int n_alleles = 7;
+    // one variants's worth of allele codes - 7 alleles over n_samples
+    int32_t *allele_codes = new int32_t[n_samples * 2];
+    for (int i = 0; i < n_samples; i+=2) {
+        allele_codes[i] = rand() % n_alleles;
+        allele_codes[i+1] = rand() % n_alleles;
+    }
+    const long file_size = test_write_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes);
+    delete[] allele_codes;
+
+    //TODO: hm - for some reason, the file is 350028 on my Mac, but is 353340 on CI/linux
+    //BOOST_REQUIRE_EQUAL(file_size, 350028); // cause thats what it is
+}
+
+BOOST_AUTO_TEST_CASE(test_write_pgen_bad_allele_code) {
+    constexpr long n_variants = 6;
+    constexpr int n_samples = 3;
+    // one variants's worth of allele codes - 2 alleles over 3 samples, with on bad allele code
+    constexpr int32_t allele_codes[] {0, 0, 0, -17, 0, 0 };
+    //TODO: fix the error messages in the C++ code
+    const char* const expectedMessage = "ConvertMultiAlleleCodesUnsafe";
+    BOOST_REQUIRE_EXCEPTION(
+            test_write_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes),
+            PgenException,
+            [expectedMessage](PgenException ex) -> bool {
+                return strstr(ex.what(), expectedMessage);
+            }
+    );
 }
 
 // say we're going to write 10 variants, but don't write them
