@@ -19,7 +19,7 @@ namespace pgenlib {
         public:
             PgenException(const char* message) {
                 // make a copy in our reserved memory, since the caller is probably about to throw...
-                this->message = strncpy(reservedForExceptionMessage, message, 1024);
+                this->message = strncpy(reservedForExceptionMessage, message, kReservedMessageBufSize);
             }
 
             virtual const char* what() const throw() {

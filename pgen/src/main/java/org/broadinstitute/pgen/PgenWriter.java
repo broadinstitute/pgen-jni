@@ -39,6 +39,10 @@ public class PgenWriter implements VariantContextWriter {
     private long pgenContextHandle;
     private ByteBuffer alleleBuffer;
 
+    // private long multiallelic_ct = 0;
+    // private long nonSNP_ct = 0;
+    // private long mnp_ct = 0;
+
     private int maxAltAlleles = MAX_PLINK2_ALTERNATE_ALLELES;
 
     static {
@@ -70,6 +74,8 @@ public class PgenWriter implements VariantContextWriter {
 
    @Override
     public void close() {
+        //System.out.println(String.format("Multiallelic: %d NonSNP: %d MNP: %d", multiallelic_ct, nonSNP_ct, mnp_ct));
+   
         closePgen(pgenContextHandle);
         pgenContextHandle = 0;
         destroyByteBuffer(alleleBuffer);
@@ -94,12 +100,15 @@ public class PgenWriter implements VariantContextWriter {
 
     @Override
     public void add(final VariantContext vc) {
-        if (!vc.isBiallelic()) {
-            throw new PgenJniException(
-                String.format("Variant has %d alleles - multi-allelic variants are not yet implemented by the pgen-writer: %s",
-                 vc.getNAlleles(),
-                 vc.toStringWithoutGenotypes()));
-        }
+        // if (!vc.isBiallelic()) {
+        //     multiallelic_ct++;
+        // }
+        // if (!vc.isSNP()) {
+        //     nonSNP_ct++;
+        // }
+        // if (vc.isMNP()) {
+        //     mnp_ct++;
+        // }
 
         //reset buffer
         alleleBuffer.clear();
@@ -132,7 +141,6 @@ public class PgenWriter implements VariantContextWriter {
     }
 
     private static native long openPgen(String file, int pgenWriteModeInt, long numberOfVariants, int numberOfSamples);
-    // private static native void appendBiallelic(long pgenContextHandle, )
     private native void closePgen(long pgenContextHandle);
     private native void appendAlleles(long pgenContextHandle, ByteBuffer alleles);
 

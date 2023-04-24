@@ -66,20 +66,20 @@ public class PgenWriteTest {
     @DataProvider(name="roundTripThroughPlink2Tests")
     public Object[][] roundTripThroughPlink2Provider() {
         return new Object[][] {
-            // small, bi-allelic, unphased - once for each file mode, without compression
+            // small, all bi-allelic, unphased (6 variants/3 samples), test once for each write mode, all without compression
             { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, false },
             { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false },
             { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, false },
 
-            // slightly larger, bi-allelic, phased (the concordance validation ignores phasing for
-            // now since its not preserved by the pgen writer)
+            // slightly larger, all bi-allelic, phased (600 variants, 2504 samples); the genotype concordance validation ignores
+            // phasing for now since its not preserved by the pgen writer)
             { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, false },
             { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false },
             { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, false },
  
-            // has a few multi-allelic variants - not used until multi-allelic varints are implemented
-            //{ Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false },
-            //{ Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false },
+            // large, includes multiallelic genotypes (~117,932 variants, 10 samples)
+            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false },
+            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false },
        };
     }
 
@@ -125,7 +125,7 @@ public class PgenWriteTest {
         };
     }
 
-    // disabled, since this is not really a test, just a convenient way to see how plink2 handles conversions
+    // disabled, since this is not really a pgen-jni test, just a convenient way to see how plink2 handles conversions
     @Test(dataProvider = "plink2CapabilitiesProvider", enabled = false)
     public void testPlink2Capabilities(final Path originalVCF, final PgenWriteMode pgenWriteMode) throws IOException, InterruptedException {
         // convert the test VCF to pgen, then back to vcf using plink2
@@ -161,33 +161,7 @@ public class PgenWriteTest {
          }
     }
 
-     @Test(expectedExceptions = PgenJniException.class)
-    public void testTemporarilyRejectMultiAllelic() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
-        try (final PgenWriter pgenWriter = new PgenWriter(
-                new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
-                PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
-                PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES, 
-                6,
-                3)) {
-                    final List<Allele> alleles = List.of(
-                        Allele.REF_A, Allele.ALT_C, Allele.ALT_G
-                    );
-                    final VariantContextBuilder vcb = new VariantContextBuilder("test", "chr1", 1, 1, alleles);
-                    final VariantContext ploidy3VC = vcb.genotypes(
-                        List.of(new GenotypeBuilder().name("s1").alleles(alleles).make())
-                    ).make();
-                    Assert.assertEquals(ploidy3VC.getMaxPloidy(2), 3);
-                    pgenWriter.add(ploidy3VC);
-         } catch (final PgenJniException e) {
-            Assert.assertTrue(e.getMessage().contains("multi-allelic variants are not yet implemented"));
-            throw e;
-         }
-    }
-
-    // TODO: This test is disabled until we remove the artificial "isBiAllelic" guard that is temporarily in place
-    // to prevent multi-allelics from being processed, since they aren't yet implemented.
-    @Test(expectedExceptions = PgenJniException.class, enabled = false)
+    @Test(expectedExceptions = PgenJniException.class)
     public void testRejectNonDiploid() throws IOException {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
         try (final PgenWriter pgenWriter = new PgenWriter(
