@@ -67,19 +67,22 @@ public class PgenWriteTest {
     public Object[][] roundTripThroughPlink2Provider() {
         return new Object[][] {
             // small, all bi-allelic, unphased (6 variants/3 samples), test once for each write mode, all without compression
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, false },
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false },
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, false },
+            // 1
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, "--output-chr M", false },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr M", false },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, "--output-chr M", false },
 
-            // slightly larger, all bi-allelic, phased (600 variants, 2504 samples); the genotype concordance validation ignores
+            // slightly larger, all bi-allelic, phased (600 variants/2504 samples); the genotype concordance validation ignores
             // phasing for now since its not preserved by the pgen writer)
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, false },
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false },
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, false },
+            // 1
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, "--output-chr M", false },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr M", false },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, "--output-chr M", false },
  
-            // large, includes multiallelic genotypes (~117,932 variants, 10 samples)
-            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false },
-            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false },
+            // larger still, includes ~6000 multiallelic sites (~117,932 variants/10 samples)
+            // chr1
+            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26", false },
+            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26", false },
        };
     }
 
@@ -87,6 +90,7 @@ public class PgenWriteTest {
     public void testRoundTripCompareWithPlink2(
         final Path originalVCF,
         final PgenWriteMode pgenWriteMode,
+        final String extraPlinkArgs,
         final boolean compressPGEN) throws IOException, InterruptedException {
  
         // first, convert the test VCF to pgen twice, once using the PgenWriter and once using plink2
@@ -99,8 +103,8 @@ public class PgenWriteTest {
         TestUtils.copyPGENCompanionFiles(plink2FileSet, jniFileSet);
 
         // now, use plink2 to reconvert both of the pgens back into VCFs
-        final Path vcfFromPGEN_jni = TestUtils.pgenToVCF_plink2(jniFileSet, "FromJNI", null, compressPGEN);
-        final Path vcfFromPGEN_plink2 = TestUtils.pgenToVCF_plink2(plink2FileSet, "FromPlink2", null, compressPGEN);
+        final Path vcfFromPGEN_jni = TestUtils.pgenToVCF_plink2(jniFileSet, "FromJNI", extraPlinkArgs, compressPGEN);
+        final Path vcfFromPGEN_plink2 = TestUtils.pgenToVCF_plink2(plink2FileSet, "FromPlink2", extraPlinkArgs, compressPGEN);
 
         if (pgenWriteMode != PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX) {
             // while we're at it, run plink2 --pgen-diff on the outputs
@@ -112,9 +116,12 @@ public class PgenWriteTest {
         // also, run a plink2 diff
         TestUtils.pgenDiff_plink2(jniFileSet, jniFileSet);
 
-        // finally, compare the two round tripped vcfs to see if they're equivalent (note that equivalence doesn't mean they're
-        // correct,  only that the pgen we generated is concordant with plink2's)
+        // compare the two round tripped vcfs to see if they're equivalent (note that equivalence doesn't mean they're
+        // correct, only that the pgen we generated is concordant with plink2's)
         TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, vcfFromPGEN_plink2);
+
+        // for extra measure, compare the pgen-jni roundtripped plink2-generated vcf with the ORIGINAL vcf
+        TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, originalVCF);
     }
 
     @DataProvider(name="plink2CapabilitiesProvider")
