@@ -63,6 +63,8 @@ BOOST_DATA_TEST_CASE(test_write_biallelic_pgen_small, s_pgenFileMode) {
     constexpr int n_samples = 3;
     // one variants's worth of allele codes - 2 alleles over 3 samples
     constexpr int32_t allele_codes[] {0, 0, 0, 0, 0, 0 };
+    // don't be fooled by the reference to the variable "sample" below; its a variable name introduced by
+    // the boost macro to refer to the parameter for the test case, which in this test is the pgen file mode...
     test_write_pgen(n_variants, n_samples, sample, allele_codes);
     // ignore the file size, since it varies with the file mode
 }
@@ -119,7 +121,8 @@ BOOST_AUTO_TEST_CASE(test_invalid_write_mode) {
 
 //******************* Start Local Test Utils *******************
 
-// writing of a pGEN file given allele codes (the same vector is used for each variant), # variants, # samples and write mode
+// writing of a pGEN file given allele codes (the same allele code vector is used for each variant),
+// # variants, # samples, and write mode
 long test_write_pgen(
         const long n_variants,
         const int n_samples,

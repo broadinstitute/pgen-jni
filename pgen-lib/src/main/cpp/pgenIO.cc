@@ -223,7 +223,7 @@ namespace pgenlib {
 //      if allele_ct == -1:
 //          raise RuntimeError("append_alleles called with invalid allele codes")
         if (allele_ct == -1) {
-            throw new PgenException("plink2::ConvertMultiAlleleCodesUnsafe return == -1");
+            throw PgenException("plink2::ConvertMultiAlleleCodesUnsafe return == -1");
         }
         //TODO: code this in
 //      if <uint32_t>(allele_ct) > allele_ct_limit:
