@@ -74,7 +74,10 @@ BOOST_AUTO_TEST_CASE(test_write_biallelic_pgen_large) {
     constexpr long n_variants = 100000L;
     constexpr int n_samples = 10000;
     // one variants's worth of allele codes - 2 alleles over n_samples
-    int32_t const *allele_codes = new int32_t[n_samples * 2];
+    int32_t *allele_codes = new int32_t[n_samples * 2];
+    for (int i = 0; i < n_samples * 2; i++) {
+        allele_codes[i] = 0;
+    }
     const long file_size = test_write_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes);
     delete[] allele_codes;
 
