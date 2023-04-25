@@ -16,6 +16,7 @@ using namespace pgenlib;
 //******************* Forward Declarations/Constants *******************
 constexpr int TMP_FILENAME_SIZE = 4096;
 template<size_t N> void createTempFile(const char* const nameTemplate, char (&outputFileName)[N]);
+void generate_random_allele_codes(int32_t* const allele_codes, const int n_samples, const int n_alleles);
 long test_write_pgen(
         const long n_variants,
         const int n_samples,
@@ -52,7 +53,7 @@ BOOST_AUTO_TEST_CASE(test_pglerr_string_conversion) {
     );
 }
 
-// write a small, bi-allelic pgen file once with each possible file write mode
+// write a small, bi-allelic pgen file, once with each possible file write mode
 static constexpr boost::array<int, 3> s_pgenFileMode {
     PGEN_FILE_MODE_BACKWARD_SEEK,
     PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
@@ -62,7 +63,7 @@ BOOST_DATA_TEST_CASE(test_write_biallelic_small, s_pgenFileMode) {
     constexpr long n_variants = 6;
     constexpr int n_samples = 3;
     // one variants's worth of allele codes - 2 alleles over 3 samples
-    constexpr int32_t allele_codes[] {0, 0, 0, 0, 0, 0 };
+    constexpr int32_t allele_codes[] {0, 0, 0, 1, 1, 1 };
     // don't be fooled by the reference to the variable "sample" below; its a variable name introduced by
     // the boost macro to refer to the parameter for the test case, which in this test is the pgen file mode...
     test_write_pgen(n_variants, n_samples, sample, allele_codes);
@@ -74,12 +75,9 @@ BOOST_AUTO_TEST_CASE(test_write_biallelic_large) {
     constexpr long n_variants = 100000L;
     constexpr int n_samples = 10000;
     constexpr int n_alleles = 2;
-    // one variants's worth of allele codes - 2 alleles over n_samples
+    // one variants's worth of allele codes drawn from 2 alleles
     int32_t *allele_codes = new int32_t[n_samples * 2];
-    for (int i = 0; i < n_samples; i+=2) {
-        allele_codes[i] = rand() % n_alleles;
-        allele_codes[i+1] = rand() % n_alleles;
-    }
+    generate_random_allele_codes(allele_codes, n_samples, n_alleles);
     const long file_size = test_write_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes);
     delete[] allele_codes;
 
@@ -92,12 +90,9 @@ BOOST_AUTO_TEST_CASE(test_write_multi_allelic_large) {
     constexpr long n_variants = 100000L;
     constexpr int n_samples = 10000;
     constexpr int n_alleles = 7;
-    // one variants's worth of allele codes - 7 alleles over n_samples
+    // synthesize one variants's worth of allele codes, with genotypes randomly drawn from 7 allele codes
     int32_t *allele_codes = new int32_t[n_samples * 2];
-    for (int i = 0; i < n_samples; i+=2) {
-        allele_codes[i] = rand() % n_alleles;
-        allele_codes[i+1] = rand() % n_alleles;
-    }
+    generate_random_allele_codes(allele_codes, n_samples, n_alleles);
     const long file_size = test_write_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes);
     delete[] allele_codes;
 
@@ -110,13 +105,12 @@ BOOST_AUTO_TEST_CASE(test_write_bad_allele_code) {
     constexpr int n_samples = 3;
     // one variants's worth of allele codes - 2 alleles over 3 samples, with on bad allele code
     constexpr int32_t allele_codes[] {0, 0, 0, -17, 0, 0 };
-    //TODO: fix the error messages in the C++ code
-    const char* const expectedMessage = "ConvertMultiAlleleCodesUnsafe";
+    const char* const expectedMessageFragment = "Attempt to append invalid allele code";
     BOOST_REQUIRE_EXCEPTION(
             test_write_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes),
             PgenException,
-            [expectedMessage](PgenException ex) -> bool {
-                return strstr(ex.what(), expectedMessage);
+            [expectedMessageFragment](PgenException ex) -> bool {
+                return strstr(ex.what(), expectedMessageFragment);
             }
     );
 }
@@ -158,38 +152,14 @@ BOOST_AUTO_TEST_CASE(test_invalid_write_mode) {
     );
 }
 
-//******************* Start Local Test Utils *******************
+//******************* Local Test Utilities *******************
 
-// writing of a pGEN file given allele codes (the same allele code vector is used for each variant),
-// # variants, # samples, and write mode
-long test_write_pgen(
-        const long n_variants,
-        const int n_samples,
-        const int pgen_file_mode,
-        const int32_t *allele_codes) {
-    char tmp_file_name[TMP_FILENAME_SIZE];
-    createTempFile("test_write.pgen", tmp_file_name);
-
-    const pgenlib::PgenContext *const pgen_context = pgenlib::openPgen(
-            tmp_file_name,
-            pgen_file_mode,
-            n_variants,
-            n_samples);
-    BOOST_REQUIRE_NE(pgen_context, nullptr);
-    for (int i = 0; i < n_variants; i++) {
-        pgenlib::appendAlleles(pgen_context, allele_codes);
+// generate random allele codes, drawn from n_alleles, for n_samples
+void generate_random_allele_codes(int32_t* const allele_codes, const int n_samples, const int n_alleles) {
+    for (int i = 0; i < n_samples; i+=2) {
+        allele_codes[i] = rand() % n_alleles;
+        allele_codes[i+1] = rand() % n_alleles;
     }
-    closePgen(pgen_context);
-
-    // for now, just validate that the file has SOME contents; the enclosing pgen project has test code
-    // that verifies the contents using plink2
-    struct stat st;
-    stat(tmp_file_name, &st);
-    const long file_size = st.st_size;
-    BOOST_REQUIRE_NE(file_size, 0);
-
-    unlink(tmp_file_name);
-    return file_size;
 }
 
 // the caller should call unlink() on the resulting file to cause it to be deleted (careful - if its open
@@ -213,4 +183,37 @@ void createTempFile(const char* const nameTemplate, char (&outputFileName)[N]) {
     }
     // the file is open, so close it, but DON'T call unlink for it to be deleted - leave that to the caller...
     close(fDesc);
+}
+
+// writing of a pGEN file given allele codes (the same allele code vector is used for each variant),
+// given # of variants, # of samples, and write mode
+long test_write_pgen(
+        const long n_variants,
+        const int n_samples,
+        const int pgen_file_mode,
+        const int32_t *allele_codes) {
+    char tmp_file_name[TMP_FILENAME_SIZE];
+    createTempFile("test_write.pgen", tmp_file_name);
+
+    const pgenlib::PgenContext *const pgen_context = pgenlib::openPgen(
+            tmp_file_name,
+            pgen_file_mode,
+            n_variants,
+            n_samples);
+    BOOST_REQUIRE_NE(pgen_context, nullptr);
+
+    for (int i = 0; i < n_variants; i++) {
+        pgenlib::appendAlleles(pgen_context, allele_codes);
+    }
+    closePgen(pgen_context);
+
+    // for now, just validate that the file has SOME contents; the enclosing pgen project has test code
+    // that verifies the contents using plink2
+    struct stat st;
+    stat(tmp_file_name, &st);
+    const long file_size = st.st_size;
+    BOOST_REQUIRE_NE(file_size, 0);
+
+    unlink(tmp_file_name);
+    return file_size;
 }

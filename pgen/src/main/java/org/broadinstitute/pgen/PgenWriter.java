@@ -19,8 +19,8 @@ import java.util.Map;
 
 public class PgenWriter implements VariantContextWriter {
 
-    public static final int NO_CALL_VALUE = -9;
-    public static final int MAX_PLINK2_ALTERNATE_ALLELES = 255;
+    public static final int PLINK2_NO_CALL_VALUE = -9;
+    public static final int PLINK2_MAX_ALTERNATE_ALLELES = 255;
 
     public enum PgenWriteMode {
         PGEN_FILE_MODE_BACKWARD_SEEK(0),
@@ -43,7 +43,7 @@ public class PgenWriter implements VariantContextWriter {
     // private long nonSNP_ct = 0;
     // private long mnp_ct = 0;
 
-    private int maxAltAlleles = MAX_PLINK2_ALTERNATE_ALLELES;
+    private int maxAltAlleles = PLINK2_MAX_ALTERNATE_ALLELES;
 
     static {
         System.loadLibrary("pgen");
@@ -51,9 +51,9 @@ public class PgenWriter implements VariantContextWriter {
 
     // doesn't preserve phasing
     public PgenWriter(final HtsPath file, final PgenWriteMode pgenWriteMode, final int maxAltAlleles, final long numberOfVariants, final int numberOfSamples) {
-        if (maxAltAlleles > MAX_PLINK2_ALTERNATE_ALLELES) {
+        if (maxAltAlleles > PLINK2_MAX_ALTERNATE_ALLELES) {
             throw new PgenJniException(
-                String.format("Requested max alternate alleles of (%d) exceeds the supported pgen max of %d", maxAltAlleles, MAX_PLINK2_ALTERNATE_ALLELES));
+                String.format("Requested max alternate alleles of (%d) exceeds the supported pgen max of %d", maxAltAlleles, PLINK2_MAX_ALTERNATE_ALLELES));
         }
         this.maxAltAlleles = maxAltAlleles;
 
@@ -89,7 +89,7 @@ public class PgenWriter implements VariantContextWriter {
 
     private static Map<Allele, Integer> buildAlleleMap(final VariantContext vc) {
         final Map<Allele, Integer> alleleMap = new HashMap<>(vc.getAlleles().size() + 1);
-        alleleMap.put(Allele.NO_CALL, NO_CALL_VALUE); // convenience for lookup
+        alleleMap.put(Allele.NO_CALL, PLINK2_NO_CALL_VALUE); // convenience for lookup
         final List<Allele> alleles = vc.getAlleles();
         for (int i = 0; i < alleles.size(); i++) {
             alleleMap.put(alleles.get(i), i);
@@ -114,17 +114,14 @@ public class PgenWriter implements VariantContextWriter {
         alleleBuffer.clear();
         final Map<Allele, Integer> alleleMap = buildAlleleMap(vc);
 
-        //System.out.println("\nVariant: " + vc.getContig() + "/" + vc.getStart());
         for (final Genotype g : vc.getGenotypes()) {
             if (g.getPloidy() != 2) {
                 throw new PgenJniException(
                     "PGEN only supports diploid samples and we see one with ploidy = " + g.getPloidy()
                         + " at line " + vc.toStringDecodeGenotypes());
             }
-            //System.out.println("  Genotype: " + g.getSampleName());
             for (final Allele allele : g.getAlleles()) {
                 final Integer mapping = alleleMap.get(allele);
-                //System.out.println("    Allele: " + allele.getBaseString() + ": " + mapping);
                 try {
                     alleleBuffer.putInt(mapping);
                 } catch (BufferOverflowException e){

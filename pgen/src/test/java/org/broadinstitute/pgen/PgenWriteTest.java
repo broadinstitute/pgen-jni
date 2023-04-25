@@ -34,7 +34,7 @@ public class PgenWriteTest {
             final PgenWriter unused = new PgenWriter(
                 new HtsPath(readOnlyFile.getAbsolutePath()),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
-                PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES,
+                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES,
                 6,
                 3);
         } catch (final PgenJniException e) {
@@ -52,7 +52,7 @@ public class PgenWriteTest {
              final PgenWriter writer = new PgenWriter(
                     new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                     PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
-                    PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES,
+                    PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES,
                     vcfMetaData.nVariants(),
                     vcfMetaData.nSamples())) {
                 reader.forEach(vc -> writer.add(vc));
@@ -114,7 +114,7 @@ public class PgenWriteTest {
         }
 
         // also, run a plink2 diff
-        TestUtils.pgenDiff_plink2(jniFileSet, jniFileSet);
+        TestUtils.pgenDiff_plink2(jniFileSet, plink2FileSet);
 
         // compare the two round tripped vcfs to see if they're equivalent (note that equivalence doesn't mean they're
         // correct, only that the pgen we generated is concordant with plink2's)
@@ -159,7 +159,7 @@ public class PgenWriteTest {
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                  // use write and copy mode here so we don't have to clean up the temp file when we abort artificially
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY,
-                PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES,
+                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES,
                 6, // claim we'll write 6 variants, but don't write them
                 3)) {
          } catch (final PgenJniException e) {
@@ -174,7 +174,7 @@ public class PgenWriteTest {
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
-                PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES, 
+                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES, 
                 6,
                 3)) {
                     final List<Allele> alleles = List.of(
@@ -198,7 +198,7 @@ public class PgenWriteTest {
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
-                PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES + 1, 
+                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES + 1, 
                 6,
                 3)) {
          } catch (final PgenJniException e) {

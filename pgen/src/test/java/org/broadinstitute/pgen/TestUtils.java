@@ -103,7 +103,7 @@ public class TestUtils {
             final PgenWriter writer = new PgenWriter(
                                                 new HtsPath(pgenFileSet.pGenPath.toAbsolutePath().toString()),
                                                 pgenWriteMode,
-                                                PgenWriter.MAX_PLINK2_ALTERNATE_ALLELES,
+                                                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES,
                                                 vcfMetaData.nVariants,
                                                 vcfMetaData.nSamples)) {
             reader.forEach(vc -> writer.add(vc));
