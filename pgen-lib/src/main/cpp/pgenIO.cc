@@ -168,8 +168,8 @@ namespace pgenlib {
         return pGenContext;
     }
 
-    void appendAlleles(const PgenContext *const pGenContext, const int32_t* allele_codes ) {
-        //TODO: for now just say allPhased == false;
+    void appendAlleles(const PgenContext *const pGenContext, const int32_t* allele_codes) {
+        //TODO: for now just say allPhased == false since there is no phaseinfo provided;
         bool allPhased = false;
 //        uintptr_t* genovec = pGenContext->genovec;
 //        plink2::AlleleCodesToGenoarrUnsafe(allele_codes, nullptr, plink2::SpgwGetSampleCt(pGenContext->spgwp), genovec, nullptr, nullptr);

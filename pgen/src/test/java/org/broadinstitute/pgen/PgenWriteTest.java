@@ -66,21 +66,26 @@ public class PgenWriteTest {
     @DataProvider(name="roundTripThroughPlink2Tests")
     public Object[][] roundTripThroughPlink2Provider() {
         return new Object[][] {
+            // These tests create a PGEN from a VCF, and then validate the generated PGEN by using plink2 to generate a VCF
+            // from that PGEN, and then comparing the roundtripped VCF with the original VCF to validate genotype concordance.
+            // Since plink2 doesn't respect the chromosome names contained in the PGEN's companion PVAR when generating such a
+            // VCF, and instead generates names using one of several predefined schemes identified by codes that can be provided
+            // on the command line via the "--output-chr" argument, each of these test cases has to include an appropriate
+            // "--output-chr" argument in order to make the subsequent VCF comparison to the original easier. See
+            //https://www.cog-genomics.org/plink/2.0/data#irreg_output.
+            
             // small, all bi-allelic, unphased (6 variants/3 samples), test once for each write mode, all without compression
-            // 1
             { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, "--output-chr M", false },
             { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr M", false },
             { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, "--output-chr M", false },
 
             // slightly larger, all bi-allelic, phased (600 variants/2504 samples); the genotype concordance validation ignores
             // phasing for now since its not preserved by the pgen writer)
-            // 1
             { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, "--output-chr M", false },
             { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr M", false },
             { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, "--output-chr M", false },
  
             // larger still, includes ~6000 multiallelic sites (~117,932 variants/10 samples)
-            // chr1
             { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26", false },
             { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26", false },
        };

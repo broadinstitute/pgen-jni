@@ -17,7 +17,7 @@ using namespace pgenlib;
 constexpr int TMP_FILENAME_SIZE = 4096;
 template<size_t N> void createTempFile(const char* const nameTemplate, char (&outputFileName)[N]);
 void generate_random_allele_codes(int32_t* const allele_codes, const int n_samples, const int n_alleles);
-long test_write_pgen(
+long test_write_unphased_pgen(
         const long n_variants,
         const int n_samples,
         const int pgen_file_mode,
@@ -59,26 +59,26 @@ static constexpr boost::array<int, 3> s_pgenFileMode {
     PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
     PGEN_FILE_MODE_WRITE_AND_COPY
 };
-BOOST_DATA_TEST_CASE(test_write_biallelic_small, s_pgenFileMode) {
+BOOST_DATA_TEST_CASE(test_write_unphased_biallelic_small, s_pgenFileMode) {
     constexpr long n_variants = 6;
     constexpr int n_samples = 3;
     // one variants's worth of allele codes - 2 alleles over 3 samples
     constexpr int32_t allele_codes[] {0, 0, 0, 1, 1, 1 };
     // don't be fooled by the reference to the variable "sample" below; its a variable name introduced by
     // the boost macro to refer to the parameter for the test case, which in this test is the pgen file mode...
-    test_write_pgen(n_variants, n_samples, sample, allele_codes);
+    test_write_unphased_pgen(n_variants, n_samples, sample, allele_codes);
     // ignore the file size, since it varies with the file mode
 }
 
 // write a larger, bi-allelic pgen, using only file mode PGEN_FILE_MODE_WRITE_AND_COPY
-BOOST_AUTO_TEST_CASE(test_write_biallelic_large) {
+BOOST_AUTO_TEST_CASE(test_write_unphased_biallelic_large) {
     constexpr long n_variants = 100000L;
     constexpr int n_samples = 10000;
     constexpr int n_alleles = 2;
     // one variants's worth of allele codes drawn from 2 alleles
     int32_t *allele_codes = new int32_t[n_samples * 2];
     generate_random_allele_codes(allele_codes, n_samples, n_alleles);
-    const long file_size = test_write_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes);
+    const long file_size = test_write_unphased_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes);
     delete[] allele_codes;
 
     //TODO: hm - for some reason, the file is 350028 on my Mac, but is 353340 on CI/linux
@@ -86,14 +86,14 @@ BOOST_AUTO_TEST_CASE(test_write_biallelic_large) {
 }
 
 // write a larger, bi-allelic pgen, using only file mode PGEN_FILE_MODE_WRITE_AND_COPY
-BOOST_AUTO_TEST_CASE(test_write_multi_allelic_large) {
+BOOST_AUTO_TEST_CASE(test_write_unphased_multi_allelic_large) {
     constexpr long n_variants = 100000L;
     constexpr int n_samples = 10000;
     constexpr int n_alleles = 7;
     // synthesize one variants's worth of allele codes, with genotypes randomly drawn from 7 allele codes
     int32_t *allele_codes = new int32_t[n_samples * 2];
     generate_random_allele_codes(allele_codes, n_samples, n_alleles);
-    const long file_size = test_write_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes);
+    const long file_size = test_write_unphased_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes);
     delete[] allele_codes;
 
     //TODO: hm - for some reason, the file is 350028 on my Mac, but is 353340 on CI/linux
@@ -107,7 +107,7 @@ BOOST_AUTO_TEST_CASE(test_write_bad_allele_code) {
     constexpr int32_t allele_codes[] {0, 0, 0, -17, 0, 0 };
     const char* const expectedMessageFragment = "Attempt to append invalid allele code";
     BOOST_REQUIRE_EXCEPTION(
-            test_write_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes),
+            test_write_unphased_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes),
             PgenException,
             [expectedMessageFragment](PgenException ex) -> bool {
                 return strstr(ex.what(), expectedMessageFragment);
@@ -185,9 +185,9 @@ void createTempFile(const char* const nameTemplate, char (&outputFileName)[N]) {
     close(fDesc);
 }
 
-// writing of a pGEN file given allele codes (the same allele code vector is used for each variant),
+// write a (unphased) pGEN file given allele codes (the same allele code vector is used for each variant),
 // given # of variants, # of samples, and write mode
-long test_write_pgen(
+long test_write_unphased_pgen(
         const long n_variants,
         const int n_samples,
         const int pgen_file_mode,
