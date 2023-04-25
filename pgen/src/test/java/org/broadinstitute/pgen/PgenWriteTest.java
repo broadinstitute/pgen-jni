@@ -72,7 +72,7 @@ public class PgenWriteTest {
             // VCF, and instead generates names using one of several predefined schemes identified by codes that can be provided
             // on the command line via the "--output-chr" argument, each of these test cases has to include an appropriate
             // "--output-chr" argument in order to make the subsequent VCF comparison to the original easier. See
-            //https://www.cog-genomics.org/plink/2.0/data#irreg_output.
+            // https://www.cog-genomics.org/plink/2.0/data#irreg_output.
             
             // small, all bi-allelic, unphased (6 variants/3 samples), test once for each write mode, all without compression
             { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, "--output-chr M", false },
