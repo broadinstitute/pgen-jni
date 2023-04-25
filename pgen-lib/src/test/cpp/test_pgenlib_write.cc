@@ -156,7 +156,7 @@ BOOST_AUTO_TEST_CASE(test_invalid_write_mode) {
 
 // generate random allele codes, drawn from n_alleles, for n_samples
 void generate_random_allele_codes(int32_t* const allele_codes, const int n_samples, const int n_alleles) {
-    for (int i = 0; i < n_samples; i+=2) {
+    for (int i = 0; i < (n_samples * 2); i+=2) {
         allele_codes[i] = rand() % n_alleles;
         allele_codes[i+1] = rand() % n_alleles;
     }
