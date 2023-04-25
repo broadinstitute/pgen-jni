@@ -30,7 +30,7 @@ constexpr int PGEN_FILE_MODE_WRITE_AND_COPY = static_cast<int>(plink2::PgenWrite
 //******************* Tests *******************
 
 // simple test to exercise throwing/catching of PgenException
-BOOST_AUTO_TEST_CASE(test_pgen_exception_propagation) {
+BOOST_AUTO_TEST_CASE(test_exception_propagation) {
     const char* const expectedPropagationMessage = "Fake pgen exception";
     BOOST_REQUIRE_EXCEPTION(
             throw PgenException(expectedPropagationMessage),
@@ -41,7 +41,7 @@ BOOST_AUTO_TEST_CASE(test_pgen_exception_propagation) {
     );
 }
 
-BOOST_AUTO_TEST_CASE(test_pgl_string_conversion) {
+BOOST_AUTO_TEST_CASE(test_pglerr_string_conversion) {
     const char* const expectedMessage = "kPglRetNotYetSupported";
     BOOST_REQUIRE_EXCEPTION(
             throwOnPglErr(plink2::PglErr::ec::kPglRetNotYetSupported, "Testing PglErr conversion"),
@@ -58,7 +58,7 @@ static constexpr boost::array<int, 3> s_pgenFileMode {
     PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
     PGEN_FILE_MODE_WRITE_AND_COPY
 };
-BOOST_DATA_TEST_CASE(test_write_biallelic_pgen_small, s_pgenFileMode) {
+BOOST_DATA_TEST_CASE(test_write_biallelic_small, s_pgenFileMode) {
     constexpr long n_variants = 6;
     constexpr int n_samples = 3;
     // one variants's worth of allele codes - 2 alleles over 3 samples
@@ -70,7 +70,7 @@ BOOST_DATA_TEST_CASE(test_write_biallelic_pgen_small, s_pgenFileMode) {
 }
 
 // write a larger, bi-allelic pgen, using only file mode PGEN_FILE_MODE_WRITE_AND_COPY
-BOOST_AUTO_TEST_CASE(test_write_biallelic_pgen_large) {
+BOOST_AUTO_TEST_CASE(test_write_biallelic_large) {
     constexpr long n_variants = 100000L;
     constexpr int n_samples = 10000;
     constexpr int n_alleles = 2;
@@ -88,7 +88,7 @@ BOOST_AUTO_TEST_CASE(test_write_biallelic_pgen_large) {
 }
 
 // write a larger, bi-allelic pgen, using only file mode PGEN_FILE_MODE_WRITE_AND_COPY
-BOOST_AUTO_TEST_CASE(test_write_multi_allelic_pgen_large) {
+BOOST_AUTO_TEST_CASE(test_write_multi_allelic_large) {
     constexpr long n_variants = 100000L;
     constexpr int n_samples = 10000;
     constexpr int n_alleles = 7;
@@ -105,7 +105,7 @@ BOOST_AUTO_TEST_CASE(test_write_multi_allelic_pgen_large) {
     //BOOST_REQUIRE_EQUAL(file_size, 350028); // cause thats what it is
 }
 
-BOOST_AUTO_TEST_CASE(test_write_pgen_bad_allele_code) {
+BOOST_AUTO_TEST_CASE(test_write_bad_allele_code) {
     constexpr long n_variants = 6;
     constexpr int n_samples = 3;
     // one variants's worth of allele codes - 2 alleles over 3 samples, with on bad allele code
@@ -122,7 +122,7 @@ BOOST_AUTO_TEST_CASE(test_write_pgen_bad_allele_code) {
 }
 
 // say we're going to write 10 variants, but don't write them
-BOOST_AUTO_TEST_CASE(test_close_pgen_with_no_writes) {
+BOOST_AUTO_TEST_CASE(test_close_with_no_writes) {
     const char* const expectedNoWriteMessage = "number of written variants";
     char tmpFileName[TMP_FILENAME_SIZE];
     createTempFile("test_write.pgen", tmpFileName);

@@ -83,7 +83,7 @@ namespace pgenlib {
                                                                   pGenContext->spgwp, // STPgenWriter * spgwp
                                                                   &alloc_cacheline_ct, //  uintptr_t* alloc_cacheline_ct
                                                                   &max_vrec_len);  // max vrec len ptr
-        throwOnPglErr(init1Result, "plink2::SpgwInitPhase1 failed");
+        throwOnPglErr(init1Result, "plink2 initialization (SpgwInitPhase1 failed)");
 
         //    cdef uint32_t genovec_cacheline_ct = DivUp(sample_ct, kNypsPerCacheline)
         //    cdef uint32_t patch_01_vals_cacheline_ct = DivUp(sample_ct * sizeof(AlleleCode), kCacheline)
@@ -108,7 +108,7 @@ namespace pgenlib {
         if (plink2::cachealigned_malloc(
                 (alloc_cacheline_ct + genovec_cacheline_ct + 5 * bitvec_cacheline_ct + patch_01_vals_cacheline_ct + patch_10_vals_cacheline_ct + dosage_main_cacheline_ct) *
                 plink2::kCacheline, &spgw_alloc)) {
-            throw PgenException("Native code failure allocating plink2::cachealigned_malloc");
+            throw PgenException("Native code failure allocating cachealigned_malloc");
         }
         SpgwInitPhase2(max_vrec_len, pGenContext->spgwp, spgw_alloc);
 
@@ -223,7 +223,8 @@ namespace pgenlib {
 //      if allele_ct == -1:
 //          raise RuntimeError("append_alleles called with invalid allele codes")
         if (allele_ct == -1) {
-            throw PgenException("plink2::ConvertMultiAlleleCodesUnsafe return == -1");
+            //TODO: would be nice if we could determine what the invalid code is...
+            throw PgenException("Attempt to append invalid allele code (plink2::ConvertMultiAlleleCodesUnsafe)");
         }
         //TODO: code this in
 //      if <uint32_t>(allele_ct) > allele_ct_limit:
@@ -268,6 +269,7 @@ namespace pgenlib {
                       pGenContext->spgwp);
           }
         }
+        throwOnPglErr(pglErr, "appendAlleles");
 //      if not all_phased:
 //          if (patch_01_ct == 0) and (patch_10_ct == 0):
 //              reterr = SpgwAppendBiallelicGenovec(genovec, self._state_ptr)
@@ -305,7 +307,6 @@ namespace pgenlib {
 //      if reterr != kPglRetSuccess:
 //          raise RuntimeError("append_alleles() error " + str(reterr))
 //      return
-        throwOnPglErr(pglErr, "appendAlleles multi allelic");
     }
 
     void closePgen(const PgenContext *const pGenContext) {
