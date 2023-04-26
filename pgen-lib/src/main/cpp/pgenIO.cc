@@ -101,9 +101,6 @@ namespace pgenlib {
         // There are two copies of pgenlib.pyx in the plink2 build (that have many differences. One uses + 3, one uses + 5.
         // Prefer the one in src, and go with + 5.
         unsigned char* spgw_alloc;
-        //TODO: remove me
-        int memSize = (alloc_cacheline_ct + genovec_cacheline_ct + 5 * bitvec_cacheline_ct + dosage_main_cacheline_ct) *
-                      plink2::kCacheline;
         //    if cachealigned_malloc((alloc_cacheline_ct + genovec_cacheline_ct + 5 * bitvec_cacheline_ct + patch_01_vals_cacheline_ct + patch_10_vals_cacheline_ct + dosage_main_cacheline_ct) * kCacheline, &spgw_alloc):
         if (plink2::cachealigned_malloc(
                 (alloc_cacheline_ct + genovec_cacheline_ct + 5 * bitvec_cacheline_ct + patch_01_vals_cacheline_ct + patch_10_vals_cacheline_ct + dosage_main_cacheline_ct) *
@@ -159,10 +156,8 @@ namespace pgenlib {
         //    # bugfix (16 Apr 2023): SpgwAppendBiallelicGenovec[Hphase] assumes
         //    # trailing bits are clear
         //    self._genovec[(sample_ct - 1) // kBitsPerWordD2] = 0
-        int i1 = (pGenContext->sampleCount - 1) / plink2::kBitsPerWordD2;
         pGenContext->genovec[(pGenContext->sampleCount - 1) / plink2::kBitsPerWordD2] = 0; // rely on floor division
         //    self._phasepresent[(sample_ct - 1) // kBitsPerWord] = 0
-        int i2 = (pGenContext->sampleCount - 1) / plink2::kBitsPerWord;
         pGenContext->phasepresent[(pGenContext->sampleCount - 1) / plink2::kBitsPerWord] = 0;
 
         return pGenContext;

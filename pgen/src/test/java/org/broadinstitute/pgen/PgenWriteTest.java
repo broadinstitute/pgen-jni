@@ -72,7 +72,7 @@ public class PgenWriteTest {
             // Since plink2 doesn't respect the chromosome names contained in the PGEN's companion PVAR when generating such a
             // VCF, and instead generates names using one of several predefined schemes identified by codes that can be provided
             // on the command line via the "--output-chr" argument, each of these test cases has to include an appropriate
-            // "--output-chr" argument in order to make the subsequent VCF comparison to the original easier. See
+            // "--output-chr" argument in order to make the subsequent VCF comparison to the original succeed. See
             // https://www.cog-genomics.org/plink/2.0/data#irreg_output.
             
             // small, all bi-allelic, unphased (6 variants/3 samples), test once for each write mode, all without compression
@@ -113,14 +113,13 @@ public class PgenWriteTest {
             TestUtils.validatePgen_plink2(plink2FileSet);
         }
 
-        // also, run a plink2 diff
+        // run a plink2 diff on thee two filesets
         TestUtils.pgenDiff_plink2(jniFileSet, plink2FileSet);
 
-        // compare the two round tripped vcfs to see if they're equivalent (note that equivalence doesn't mean they're
-        // correct, only that the pgen we generated is concordant with plink2's)
+        // compare the two round tripped vcfs to each other see if they're equivalent (note that equivalence doesn't
+        // mean they're correct, only that the pgen we generated is concordant with plink2's), and then for extra measure,
+        // compare the pgen-jni roundtripped plink2-generated vcf with the ORIGINAL vcf
         TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, vcfFromPGEN_plink2);
-
-        // for extra measure, compare the pgen-jni roundtripped plink2-generated vcf with the ORIGINAL vcf
         TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, originalVCF);
     }
 
@@ -194,7 +193,7 @@ public class PgenWriteTest {
     }
 
     @Test(expectedExceptions = PgenJniException.class)
-    public void testRequestMaxAltAllelesExceeded() throws IOException {
+    public void testRequestedMaxAltAllelesExceeded() throws IOException {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("maxAltAlelesTest");
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),

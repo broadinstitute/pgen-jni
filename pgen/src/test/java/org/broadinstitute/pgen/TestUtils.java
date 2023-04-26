@@ -37,17 +37,17 @@ public class TestUtils {
 
         // create a trio of temporaary pgen files (.pgen/.pvar/.psam), and mark them, and any other possible companion files, for deletion
         public static PgenFileSet createTempPgenFileSet(final String namePrefix) throws IOException {
-            final String pGenExtension = PgenWriter.pGenExtension;
+            final String pGenExtension = PgenWriter.PGEN_EXTENSION;
 
             final Path pGenPath = createTempFile(namePrefix, pGenExtension).toPath();
             final String pgenNameWithoutExtension  = getLocalFileNameWithoutExtension(pGenPath, pGenExtension);
 
             // we have to force these to be created in order for them to be deleted on exit
-            final Path pVarPath = pGenPath.resolveSibling(pgenNameWithoutExtension + PgenWriter.pVarExtension).toAbsolutePath();
+            final Path pVarPath = pGenPath.resolveSibling(pgenNameWithoutExtension + PgenWriter.PVAR_EXTENSION).toAbsolutePath();
             pVarPath.toFile().createNewFile();
             pVarPath.toFile().deleteOnExit();
 
-            final Path pSamPath = pGenPath.resolveSibling(pgenNameWithoutExtension + PgenWriter.pSamExtension).toAbsolutePath();
+            final Path pSamPath = pGenPath.resolveSibling(pgenNameWithoutExtension + PgenWriter.PSAM_EXTENSION).toAbsolutePath();
             pSamPath.toFile().createNewFile();
             pSamPath.toFile().deleteOnExit();
 
@@ -59,12 +59,12 @@ public class TestUtils {
             pLogPath.toFile().deleteOnExit();
 
            // the .pgi index file
-           final Path pGenIndexPath = pGenPath.resolveSibling(pgenNameWithoutExtension + PgenWriter.pGenIndexExtension).toAbsolutePath();
+           final Path pGenIndexPath = pGenPath.resolveSibling(pgenNameWithoutExtension + PgenWriter.PGEN_INDEX_EXTENSION).toAbsolutePath();
            pGenIndexPath.toFile().createNewFile();
            pGenIndexPath.toFile().deleteOnExit();
 
            // the .pgen.tmp file (in case the file mode used in the test results in one)
-           final Path pGenTempPath= pGenPath.resolveSibling(pgenNameWithoutExtension + PgenWriter.pGenExtension + ".tmp").toAbsolutePath();
+           final Path pGenTempPath= pGenPath.resolveSibling(pgenNameWithoutExtension + PgenWriter.PGEN_EXTENSION + ".tmp").toAbsolutePath();
            pGenTempPath.toFile().createNewFile();
            pGenTempPath.toFile().deleteOnExit();
 
@@ -74,7 +74,7 @@ public class TestUtils {
         }
 
         // return the full pathname of the fileset's pgen file, without the file extension
-        public String getFileSetPrefix() { return PgenWriter.getAbsoluteFileNameWithoutExtension(pGenPath, PgenWriter.pGenExtension); }
+        public String getFileSetPrefix() { return PgenWriter.getAbsoluteFileNameWithoutExtension(pGenPath, PgenWriter.PGEN_EXTENSION); }
 
     }
 
