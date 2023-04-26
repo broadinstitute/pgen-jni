@@ -31,8 +31,7 @@ public class PgenWriter implements VariantContextWriter {
     public static final int PLINK2_NO_CALL_VALUE = -9;
     public static final int PLINK2_MAX_ALTERNATE_ALLELES = 255;
 
-    public static String pGenExtensionUncompressed = ".pgen";
-    public static String pGenExtensionCompressed = ".pgen.zst";
+    public static String pGenExtension = ".pgen";
     public static String pGenIndexExtension = ".pgen.pgi";    
     public static String pVarExtension = ".pvar";
     public static String pSamExtension = ".psam";
@@ -78,7 +77,7 @@ public class PgenWriter implements VariantContextWriter {
         final long numberOfVariants,
         final int maxAltAlleles) {
 
-        if (!pgenFile.hasExtension(pGenExtensionUncompressed)) {
+        if (!pgenFile.hasExtension(pGenExtension)) {
             throw new PgenJniException(
                 String.format("Invalid pgen file name: %s. pgen files must use the .pgen extension", pgenFile.getRawInputString()));
         }
@@ -98,7 +97,7 @@ public class PgenWriter implements VariantContextWriter {
         alleleBuffer.order(ByteOrder.LITTLE_ENDIAN);
 
         // create the .pvar
-        final String pgenFilePrefix = getAbsoluteFileNameWithoutExtension(pgenFile.toPath(), pGenExtensionUncompressed);
+        final String pgenFilePrefix = getAbsoluteFileNameWithoutExtension(pgenFile.toPath(), pGenExtension);
         pVarFile = new HtsPath(pgenFile.toPath()
             .resolveSibling(pgenFilePrefix + PgenWriter.pVarExtension)
             .toAbsolutePath().toString());

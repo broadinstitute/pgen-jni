@@ -26,13 +26,13 @@ public class PgenWriteTest {
 
     @SuppressWarnings("unused")
     @Test(expectedExceptions = PgenJniException.class)
-    public void testExceptionPropagation() {
-        final File readOnlyFile = TestUtils.createTempFile("pgenReadOnly", ".pgen");
-        readOnlyFile.setReadOnly();
+    public void testExceptionPropagation() throws IOException {
+        final PgenFileSet pgenFileSet = PgenFileSet.createTempPgenFileSet("pgenReadOnly");
+        pgenFileSet.pGenPath().toFile().setReadOnly();
         try {
             // force an exception to be thrown from pgen-lib by trying to write to a file that is read only
             final PgenWriter unused = new PgenWriter(
-                new HtsPath(readOnlyFile.getAbsolutePath()),
+                new HtsPath(pgenFileSet.getFileSetPrefix()),
                 TestUtils.createVCFHeader(),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
                 6,
@@ -46,7 +46,7 @@ public class PgenWriteTest {
     // this test is redundant with the more useful testRoundTripCompareWithPlink2 test below, but is convenient for debugging...
     @Test
     public void testWritePGENBiallelic() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("test", false);
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("writeBiallelic");
         final TestUtils.VcfMetaData vcfMetaData = TestUtils.getVcfMetaData(Paths.get("testdata/CEUtrioTest.vcf"));
         try (final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false);
              final PgenWriter writer = new PgenWriter(
@@ -76,19 +76,19 @@ public class PgenWriteTest {
             // https://www.cog-genomics.org/plink/2.0/data#irreg_output.
             
             // small, all bi-allelic, unphased (6 variants/3 samples), test once for each write mode, all without compression
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, "--output-chr M", false },
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr M", false },
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, "--output-chr M", false },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, "--output-chr M" },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr M" },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, "--output-chr M" },
 
             // slightly larger, all bi-allelic, phased (600 variants/2504 samples); the genotype concordance validation ignores
             // phasing for now since its not preserved by the pgen writer)
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, "--output-chr M", false },
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr M", false },
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, "--output-chr M", false },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, "--output-chr M" },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr M" },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, "--output-chr M" },
  
             // larger still, includes ~6000 multiallelic sites (~117,932 variants/10 samples)
-            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26", false },
-            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26", false },
+            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26" },
+            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26" },
        };
     }
 
@@ -96,16 +96,15 @@ public class PgenWriteTest {
     public void testRoundTripCompareWithPlink2(
         final Path originalVCF,
         final PgenWriteMode pgenWriteMode,
-        final String extraPlinkArgs,
-        final boolean compressPGEN) throws IOException, InterruptedException {
+        final String extraPlinkArgs) throws IOException, InterruptedException {
  
         // first, convert the test VCF to pgen twice, once using the PgenWriter and once using plink2
-        final TestUtils.PgenFileSet jniFileSet = TestUtils.vcfToPgen_jni(originalVCF, pgenWriteMode, compressPGEN);
-        final TestUtils.PgenFileSet plink2FileSet = TestUtils.vcfToPgen_plink2(originalVCF, compressPGEN);
+        final TestUtils.PgenFileSet jniFileSet = TestUtils.vcfToPgen_jni(originalVCF, pgenWriteMode);
+        final TestUtils.PgenFileSet plink2FileSet = TestUtils.vcfToPgen_plink2(originalVCF);
 
         // now, use plink2 to reconvert both of the pgens back into VCFs
-        final Path vcfFromPGEN_jni = TestUtils.pgenToVCF_plink2(jniFileSet, "FromJNI", extraPlinkArgs, compressPGEN);
-        final Path vcfFromPGEN_plink2 = TestUtils.pgenToVCF_plink2(plink2FileSet, "FromPlink2", extraPlinkArgs, compressPGEN);
+        final Path vcfFromPGEN_jni = TestUtils.pgenToVCF_plink2(jniFileSet, "FromJNI", extraPlinkArgs);
+        final Path vcfFromPGEN_plink2 = TestUtils.pgenToVCF_plink2(plink2FileSet, "FromPlink2", extraPlinkArgs);
 
         if (pgenWriteMode != PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX) {
             // while we're at it, run plink2 --pgen-diff on the outputs
@@ -137,11 +136,11 @@ public class PgenWriteTest {
     @Test(dataProvider = "plink2CapabilitiesProvider", enabled = false)
     public void testPlink2Capabilities(final Path originalVCF, final PgenWriteMode pgenWriteMode) throws IOException, InterruptedException {
         // convert the test VCF to pgen, then back to vcf using plink2
-        final TestUtils.PgenFileSet plink2FileSet = TestUtils.vcfToPgen_plink2(originalVCF, false);
+        final TestUtils.PgenFileSet plink2FileSet = TestUtils.vcfToPgen_plink2(originalVCF);
         final Path vcfFromPGEN_plink2 = TestUtils.pgenToVCF_plink2(
             plink2FileSet, "FromPlink2",
-             "--output-chr chr26",      // tell plink how to name contigs in the output
-              false);
+             "--output-chr chr26"      // tell plink how to name contigs in the output
+        );
 
         if (pgenWriteMode != PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX) {
             // while we're at it, run plink2 --pgen-diff on the output
@@ -155,7 +154,7 @@ public class PgenWriteTest {
 
    @Test(expectedExceptions = PgenJniException.class)
     public void testClosePGENWithNoWrites() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest");
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 TestUtils.createVCFHeader(),
@@ -172,7 +171,7 @@ public class PgenWriteTest {
 
     @Test(expectedExceptions = PgenJniException.class)
     public void testRejectNonDiploid() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest");
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 TestUtils.createVCFHeader(),
@@ -196,7 +195,7 @@ public class PgenWriteTest {
 
     @Test(expectedExceptions = PgenJniException.class)
     public void testRequestMaxAltAllelesExceeded() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("maxAltAlelesTest");
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 TestUtils.createVCFHeader(),
