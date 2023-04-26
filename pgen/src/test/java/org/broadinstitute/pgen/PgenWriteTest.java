@@ -106,6 +106,7 @@ public class PgenWriteTest {
         final Path vcfFromPGEN_jni = TestUtils.pgenToVCF_plink2(jniFileSet, "FromJNI", extraPlinkArgs);
         final Path vcfFromPGEN_plink2 = TestUtils.pgenToVCF_plink2(plink2FileSet, "FromPlink2", extraPlinkArgs);
 
+        // use plink2 to validate both of the pgen file sets
         if (pgenWriteMode != PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX) {
             // while we're at it, run plink2 --pgen-diff on the outputs
             // but only if write mode != kPgenWriteSeparateIndex, since that causes plink2 to say the pgen file is corrupted 
@@ -113,7 +114,7 @@ public class PgenWriteTest {
             TestUtils.validatePgen_plink2(plink2FileSet);
         }
 
-        // run a plink2 diff on thee two filesets
+        // run a plink2 diff on the two filesets and make sure there are no issues reported
         TestUtils.pgenDiff_plink2(jniFileSet, plink2FileSet);
 
         // compare the two round tripped vcfs to each other see if they're equivalent (note that equivalence doesn't

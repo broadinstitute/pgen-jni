@@ -58,8 +58,8 @@ public class PgenWriter implements VariantContextWriter {
 
      // native JNI methods
      private static native long openPgen(String file, int pgenWriteModeInt, long numberOfVariants, int numberOfSamples);
-     private native void closePgen(long pgenContextHandle);
-     private native void appendAlleles(long pgenContextHandle, ByteBuffer alleles);
+     private static native void closePgen(long pgenContextHandle);
+     private static native void appendAlleles(long pgenContextHandle, ByteBuffer alleles);
      private static native ByteBuffer createBuffer(int length);
      private static native void destroyByteBuffer(ByteBuffer buffer);
 

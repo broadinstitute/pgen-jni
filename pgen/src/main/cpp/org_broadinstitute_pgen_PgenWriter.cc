@@ -15,7 +15,7 @@ using namespace pgenlib;
 // C++ exceptions from lower layers that are caught here are re-thrown as Java exceptions.
 
 JNIEXPORT jlong JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject,
+Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass object,
                                                  jstring filename,
                                                  jint pgenWriteModeInt,
                                                  jlong numberOfVariants,
@@ -38,7 +38,7 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass thisObject
 }
 
 JNIEXPORT void JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv* env, jobject object,
+Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv* env, jclass object,
                                                       jlong pgenHandle,
                                                       jobject alleleBuffer){
     const int32_t* allele_codes = reinterpret_cast<int32_t*>(env->GetDirectBufferAddress(alleleBuffer));
@@ -55,7 +55,7 @@ Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv* env, jobject objec
 }
 
 JNIEXPORT void JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_closePgen (JNIEnv * env, jobject object, jlong pgenHandle){
+Java_org_broadinstitute_pgen_PgenWriter_closePgen (JNIEnv * env, jclass object, jlong pgenHandle){
     PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
     try {
         closePgen(pgenContext);
