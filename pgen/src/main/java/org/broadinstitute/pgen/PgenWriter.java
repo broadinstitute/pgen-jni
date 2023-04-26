@@ -4,15 +4,24 @@
 package org.broadinstitute.pgen;
 
 import htsjdk.io.HtsPath;
+import htsjdk.samtools.util.RuntimeIOException;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
+import htsjdk.variant.variantcontext.writer.Options;
 import htsjdk.variant.variantcontext.writer.VariantContextWriter;
+import htsjdk.variant.variantcontext.writer.VariantContextWriterBuilder;
+import htsjdk.variant.variantcontext.writer.VariantContextWriterBuilder.OutputType;
 import htsjdk.variant.vcf.VCFHeader;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,44 +31,105 @@ public class PgenWriter implements VariantContextWriter {
     public static final int PLINK2_NO_CALL_VALUE = -9;
     public static final int PLINK2_MAX_ALTERNATE_ALLELES = 255;
 
+    public static String pGenExtensionUncompressed = ".pgen";
+    public static String pGenExtensionCompressed = ".pgen.zst";
+    public static String pGenIndexExtension = ".pgen.pgi";    
+    public static String pVarExtension = ".pvar";
+    public static String pSamExtension = ".psam";
+ 
+    // native JNI methods
+    private static native long openPgen(String file, int pgenWriteModeInt, long numberOfVariants, int numberOfSamples);
+    private native void closePgen(long pgenContextHandle);
+    private native void appendAlleles(long pgenContextHandle, ByteBuffer alleles);
+    private static native ByteBuffer createBuffer(int length);
+    private static native void destroyByteBuffer(ByteBuffer buffer);
+
+    // enum for the plink2 pgen write modes
     public enum PgenWriteMode {
         PGEN_FILE_MODE_BACKWARD_SEEK(0),
         PGEN_FILE_MODE_WRITE_SEPARATE_INDEX(1),
         PGEN_FILE_MODE_WRITE_AND_COPY(2); 
 
         private final int mode;
-        
-        private PgenWriteMode(final int mode) {
-            this.mode = mode;
-        }
-
+        private PgenWriteMode(final int mode) { this.mode = mode; }
         public int value() { return this.mode; }
     };
 
     private long pgenContextHandle;
     private ByteBuffer alleleBuffer;
+    private VariantContextWriter pVarWriter;
+    private final HtsPath pVarFile;
+    private final HtsPath pSamFile;
+    private final int maxAltAlleles;
 
     // private long multiallelic_ct = 0;
     // private long nonSNP_ct = 0;
     // private long mnp_ct = 0;
-
-    private int maxAltAlleles = PLINK2_MAX_ALTERNATE_ALLELES;
 
     static {
         System.loadLibrary("pgen");
     }
 
     // doesn't preserve phasing
-    public PgenWriter(final HtsPath file, final PgenWriteMode pgenWriteMode, final int maxAltAlleles, final long numberOfVariants, final int numberOfSamples) {
+    public PgenWriter(
+        final HtsPath pgenFile,
+        final VCFHeader vcfHeader,
+        final PgenWriteMode pgenWriteMode,
+        final long numberOfVariants,
+        final int maxAltAlleles) {
+
+        if (!pgenFile.hasExtension(pGenExtensionUncompressed)) {
+            throw new PgenJniException(
+                String.format("Invalid pgen file name: %s. pgen files must use the .pgen extension", pgenFile.getRawInputString()));
+        }
+        if (!pgenFile.getScheme().equals("file")) {
+            throw new PgenJniException(String.format("Invalid pgen file name: %s. pgen files must be local files", pgenFile));
+        }
         if (maxAltAlleles > PLINK2_MAX_ALTERNATE_ALLELES) {
             throw new PgenJniException(
-                String.format("Requested max alternate alleles of (%d) exceeds the supported pgen max of %d", maxAltAlleles, PLINK2_MAX_ALTERNATE_ALLELES));
+                String.format("Requested max alternate alleles of (%d) exceeds the supported pgen max of %d",
+                    maxAltAlleles,
+                    PLINK2_MAX_ALTERNATE_ALLELES));
         }
         this.maxAltAlleles = maxAltAlleles;
 
-        pgenContextHandle = openPgen(file.getRawInputString(), pgenWriteMode.value(), numberOfVariants, numberOfSamples);
-        alleleBuffer = createBuffer(numberOfSamples*2*4); //samples * ploidy * bytes in int32
+        pgenContextHandle = openPgen(pgenFile.getRawInputString(), pgenWriteMode.value(), numberOfVariants, vcfHeader.getNGenotypeSamples());
+        alleleBuffer = createBuffer(vcfHeader.getNGenotypeSamples()*2*4); //samples * ploidy * bytes in int32
         alleleBuffer.order(ByteOrder.LITTLE_ENDIAN);
+
+        // create the .pvar
+        final String pgenFilePrefix = getAbsoluteFileNameWithoutExtension(pgenFile.toPath(), pGenExtensionUncompressed);
+        pVarFile = new HtsPath(pgenFile.toPath()
+            .resolveSibling(pgenFilePrefix + PgenWriter.pVarExtension)
+            .toAbsolutePath().toString());
+        pVarWriter = new VariantContextWriterBuilder()
+            .clearOptions()
+            .setOptions(EnumSet.of(Options.DO_NOT_WRITE_GENOTYPES, Options.ALLOW_MISSING_FIELDS_IN_HEADER))
+            .setOutputPath(pVarFile.toPath())
+            .setOutputFileType(OutputType.VCF) // plink2 expects the .pvar to have a .pvar extension
+            .build();
+        pVarWriter.writeHeader(vcfHeader);
+
+        // create, write, and close the .psam up front, so we don't have to retain the header until the end
+        pSamFile = new HtsPath(pgenFile.toPath()
+            .resolveSibling(pgenFilePrefix + PgenWriter.pSamExtension)
+            .toAbsolutePath().toString());
+        try (final BufferedWriter psamWriter = Files.newBufferedWriter(pSamFile.toPath())) {
+            final String pSamHeader = "#IID\tSEX\n";
+            psamWriter.append(pSamHeader);
+            // Sample name order matters here. I don't see any spec for the psam or pvar, but if you use plink2 to crecrate a VCF
+            // from a pgen file set, it appears uses the order of the samples in the .psam as the basis for ordering the genotypes
+            // in the VCF. So if we don't preserve the order in the .psam, the genotypes in the roundtripped VCF won't match the
+            // original VCF (and will be incorrect).
+            for (final String sampleName : vcfHeader.getGenotypeSamples()) {
+                final StringBuilder s = new StringBuilder(20);
+                s.append(sampleName);
+                s.append("\tN/A\n");
+                psamWriter.write(s.toString());
+            }
+        } catch (final IOException e) {
+            throw new RuntimeIOException(e);
+        }
     }
 
     @Override
@@ -76,8 +146,12 @@ public class PgenWriter implements VariantContextWriter {
     public void close() {
         //System.out.println(String.format("Multiallelic: %d NonSNP: %d MNP: %d", multiallelic_ct, nonSNP_ct, mnp_ct));
    
+        pVarWriter.close();
+        pVarWriter = null;
+
         closePgen(pgenContextHandle);
         pgenContextHandle = 0;
+
         destroyByteBuffer(alleleBuffer);
         alleleBuffer = null;
     }
@@ -135,12 +209,15 @@ public class PgenWriter implements VariantContextWriter {
         }
         alleleBuffer.rewind();
         appendAlleles(pgenContextHandle, alleleBuffer);
+
+        // add the VC to pvar
+        pVarWriter.add(vc);
     }
 
-    private static native long openPgen(String file, int pgenWriteModeInt, long numberOfVariants, int numberOfSamples);
-    private native void closePgen(long pgenContextHandle);
-    private native void appendAlleles(long pgenContextHandle, ByteBuffer alleles);
-
-    private static native ByteBuffer createBuffer(int length);
-    private static native void destroyByteBuffer(ByteBuffer buffer);
+    // given a Path, return the absolute path of the file, without the trailing extension
+    public static String getAbsoluteFileNameWithoutExtension(final Path targetPath, final String extension) {
+        final String targetAbsolutePath = targetPath.toAbsolutePath().toString();
+        return targetAbsolutePath.substring(0, targetAbsolutePath.lastIndexOf(extension));
+    }
+    
 }

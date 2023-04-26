@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -22,6 +23,7 @@ import htsjdk.samtools.util.IOUtil;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFFileReader;
+import htsjdk.variant.vcf.VCFHeader;
 
 // These utilities require plink2, and assume that it is installed locally and on the path. Since we rely
 // on plink2 to verify the files that are written by pgen-jni, it is prefereable to  use a version of
@@ -29,38 +31,33 @@ import htsjdk.variant.vcf.VCFFileReader;
 // round-trip errors may surface that are due to the different implementations.
 
 public class TestUtils {
-    public static String pGenExtensionUncompressed = ".pgen";
-    public static String pGenExtensionCompressed = ".pgen.zst";
-    public static String pGenIndexExtension = ".pgen.pgi";    
-    public static String pVarExtension = ".pvar";
-    public static String pSamExtension = ".psam";
+
     public static String plinkLogExtension = ".log";
-    public static String vcfExtension = FileExtensions.VCF;
 
     // class/record to hold a set of plink2 companion files as paths (.pgen/.pvar/.psam/.log)
     public record PgenFileSet(Path pGenPath, Path pVarPath, Path pSamPath, Path plinkLogFile) {
 
         // return the full pathname of the fileset's pgen file, without the file extension
         public String getFileSetPrefix() {
-            return getAbsoluteFileNameWithoutExtension(
+            return PgenWriter.getAbsoluteFileNameWithoutExtension(
                 pGenPath,
-                pGenPath.endsWith(pGenExtensionCompressed) ? pGenExtensionCompressed : pGenExtensionUncompressed);
+                pGenPath.endsWith(PgenWriter.pGenExtensionCompressed) ? PgenWriter.pGenExtensionCompressed : PgenWriter.pGenExtensionUncompressed);
         }
 
         // create a trio of temporary pgen (.pgen/.pvar/.psam), plus a log file
         public static PgenFileSet createTempPgenFileSet(final String namePrefix, final boolean useCompressedOutput) throws IOException {
-            final String pGenExtension = useCompressedOutput ? pGenExtensionCompressed : pGenExtensionUncompressed;
+            final String pGenExtension = useCompressedOutput ? PgenWriter.pGenExtensionCompressed : PgenWriter.pGenExtensionUncompressed;
 
             final Path pGenPath = createTempFile(namePrefix, pGenExtension).toPath();
-            final String pgenNameWithoutExtension  = TestUtils.getLocalFileNameWithoutExtension(pGenPath, pGenExtension);
+            final String pgenNameWithoutExtension  = getLocalFileNameWithoutExtension(pGenPath, pGenExtension);
 
             // make sure any possible companion files are also marked for deletion
             // we have to force these to be created in order for them to be deleted on exit
-            final Path pVarPath = pGenPath.resolveSibling(pgenNameWithoutExtension + pVarExtension).toAbsolutePath();
+            final Path pVarPath = pGenPath.resolveSibling(pgenNameWithoutExtension + PgenWriter.pVarExtension).toAbsolutePath();
             pVarPath.toFile().createNewFile();
             pVarPath.toFile().deleteOnExit();
 
-            final Path pSamPath = pGenPath.resolveSibling(pgenNameWithoutExtension + pSamExtension).toAbsolutePath();
+            final Path pSamPath = pGenPath.resolveSibling(pgenNameWithoutExtension + PgenWriter.pSamExtension).toAbsolutePath();
             pSamPath.toFile().createNewFile();
             pSamPath.toFile().deleteOnExit();
 
@@ -69,7 +66,7 @@ public class TestUtils {
             pLogPath.toFile().deleteOnExit();
 
            // in case we generate an external .pgi index file
-           final Path pGenIndexPath = pGenPath.resolveSibling(pgenNameWithoutExtension + pGenIndexExtension).toAbsolutePath();
+           final Path pGenIndexPath = pGenPath.resolveSibling(pgenNameWithoutExtension + PgenWriter.pGenIndexExtension).toAbsolutePath();
            pGenIndexPath.toFile().createNewFile();
            pGenIndexPath.toFile().deleteOnExit();
 
@@ -78,18 +75,32 @@ public class TestUtils {
     }
 
     // class/record to hold a metadata for a VCF
-    public record VcfMetaData(long nVariants, int nSamples){};
+    public record VcfMetaData(VCFHeader vcfHeader, long nVariants, int nSamples){};
  
     @SuppressWarnings("unused")
     public static VcfMetaData getVcfMetaData(final Path vcfPath) {
         long nVariants = 0L;
         int nSamples = 0;
+        VCFHeader vcfHeader;
         try (final VCFFileReader vcfReader = new VCFFileReader(vcfPath, false);
              final CloseableIterator<VariantContext> vcIt = vcfReader.iterator()) {
             nSamples = vcfReader.getFileHeader().getNGenotypeSamples();
             nVariants = vcIt.stream().count();
+            vcfHeader = vcfReader.getFileHeader();
         }
-        return new VcfMetaData(nVariants, nSamples);
+        return new VcfMetaData(vcfHeader, nVariants, nSamples);
+    }
+
+    // create a VCFHeader that has at least one sample, since pgen will assert (in a debug build) if the number of samples is 0
+    @SuppressWarnings("unchecked")
+    public static VCFHeader createVCFHeader() {
+        final VCFHeader vcfHeader = new VCFHeader(
+            Collections.EMPTY_SET,
+            new HashSet<String>() {{
+                add("atLeastOneSampleRequired");
+            }});
+        Assert.assertEquals(vcfHeader.getNGenotypeSamples(), 1, "the test ehaders must have at least one sample");
+        return vcfHeader;
     }
     
     // use pgen-jni to convert a VCF to PGEN and return the resulting (temporary) files as a PgenFileSet
@@ -101,11 +112,11 @@ public class TestUtils {
         final VcfMetaData vcfMetaData = getVcfMetaData(originalVCF);
         try(final VCFFileReader reader = new VCFFileReader(originalVCF, false);
             final PgenWriter writer = new PgenWriter(
-                                                new HtsPath(pgenFileSet.pGenPath.toAbsolutePath().toString()),
-                                                pgenWriteMode,
-                                                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES,
-                                                vcfMetaData.nVariants,
-                                                vcfMetaData.nSamples)) {
+                    new HtsPath(pgenFileSet.pGenPath.toAbsolutePath().toString()),
+                    vcfMetaData.vcfHeader,
+                    pgenWriteMode,
+                    vcfMetaData.nVariants,
+                    PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES)) {
             reader.forEach(vc -> writer.add(vc));
         }
         return pgenFileSet;
@@ -116,8 +127,8 @@ public class TestUtils {
         final PgenFileSet pgenFileSet = PgenFileSet.createTempPgenFileSet("vcfToPgen_plink2", compressPGEN);
         final String runCommand = String.format(
             "plink2 --vcf %s --make-pgen --out %s",
-             originalVCF.toAbsolutePath(),
-              pgenFileSet.getFileSetPrefix());
+            originalVCF.toAbsolutePath(),
+            pgenFileSet.getFileSetPrefix());
  
         final int cmdResult = executeExternalCommand(runCommand);
         Assert.assertEquals(cmdResult, 0);
@@ -131,17 +142,17 @@ public class TestUtils {
         final String sourceContext,
         final String additionalArgs, // may be null
         final boolean isCompressed) throws InterruptedException, IOException {
-        final Path plinkGeneratedVCF = createTempFile(pgenFileSet.getFileSetPrefix() + "_" + sourceContext, vcfExtension).toPath();
+        final Path plinkGeneratedVCF = createTempFile(pgenFileSet.getFileSetPrefix() + "_" + sourceContext, FileExtensions.VCF).toPath();
 
         // the following plink command will create it's own log file, so make sure it gets marked for deletion as well...
-        makeCompanionLogFileTemporary(plinkGeneratedVCF, vcfExtension);
+        makeCompanionLogFileTemporary(plinkGeneratedVCF, FileExtensions.VCF);
         
         final String runCommand = String.format(
             "plink2 --pfile %s %s %s --export vcf --out %s",
             pgenFileSet.getFileSetPrefix(),
             getDecompressCommand(pgenFileSet.pGenPath(), isCompressed),
             additionalArgs == null ? "" : additionalArgs,
-            TestUtils.getAbsoluteFileNameWithoutExtension(plinkGeneratedVCF, vcfExtension));
+            PgenWriter.getAbsoluteFileNameWithoutExtension(plinkGeneratedVCF, FileExtensions.VCF));
 
         final int cmdResult = executeExternalCommand(runCommand);
         Assert.assertEquals(cmdResult, 0);
@@ -186,19 +197,6 @@ public class TestUtils {
         Assert.assertTrue(diffOutput.get(0).equals("#ID\tIID\tGT1\tGT2"));
     }
  
-    // Propagate the contents of the .pvar and .psam file from a Plink2-generated fileset to a jni-generated
-    // fileset (temporary until the PgenWriter supports writing these companion files).
-    //
-    // This is a temporary hack needed so we can use plink2 (which requires a complete pgen fileset to convert back
-    // to VCF) to validate pgen output without having to generated the .pvar/.psam files ourself. When we have that,
-    // this can be removed.
-    //
-    public static void copyPGENCompanionFiles(final PgenFileSet sourcFileSet, final PgenFileSet targetFileSet) throws IOException {
-        // use StandardCopyOption.REPLACE_EXISTING because we've already created the file in order to mark it deleteOnExit
-        Files.copy(sourcFileSet.pSamPath, targetFileSet.pSamPath, StandardCopyOption.REPLACE_EXISTING);
-        Files.copy(sourcFileSet.pVarPath, targetFileSet.pVarPath, StandardCopyOption.REPLACE_EXISTING);
-    }
-
     // execute an external command
     public static int executeExternalCommand(final String runCommand) throws InterruptedException, IOException {
         final Process process = Runtime.getRuntime().exec(runCommand);
@@ -282,12 +280,6 @@ public class TestUtils {
         }
     }
 
-    // given a Path, return the absolute path of the file, without the trailing extension
-    public static String getAbsoluteFileNameWithoutExtension(final Path targetPath, final String extension) {
-        final String targetAbsolutePath = targetPath.toAbsolutePath().toString();
-        return targetAbsolutePath.substring(0, targetAbsolutePath.lastIndexOf(extension));
-    }
-
      // given a Path, return the prefix of only the terminal part of the filename (only the last segment of the
      // filename, without any extension)
      public static String getLocalFileNameWithoutExtension(final Path targetPath, final String extension) {
@@ -305,7 +297,7 @@ public class TestUtils {
     // generate a potential plink2-generated logfile name make sure its marked for deletion
     private static Path makeCompanionLogFileTemporary(final Path plink2File, final String plink2FileExtension) {
         final File conversionLogFile = new File(plink2File.resolveSibling(
-            TestUtils.getLocalFileNameWithoutExtension(plink2File, plink2FileExtension) + plinkLogExtension).toFile().toString());
+            getLocalFileNameWithoutExtension(plink2File, plink2FileExtension) + plinkLogExtension).toFile().toString());
         conversionLogFile.deleteOnExit();
         return conversionLogFile.toPath();
     }

@@ -9,6 +9,7 @@ import htsjdk.variant.variantcontext.GenotypeBuilder;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
 import htsjdk.variant.vcf.VCFFileReader;
+import htsjdk.variant.vcf.VCFHeader;
 
 import org.broadinstitute.pgen.PgenWriter.PgenWriteMode;
 import org.broadinstitute.pgen.TestUtils.PgenFileSet;
@@ -33,10 +34,10 @@ public class PgenWriteTest {
             // force an exception to be thrown from pgen-lib by trying to write to a file that is read only
             final PgenWriter unused = new PgenWriter(
                 new HtsPath(readOnlyFile.getAbsolutePath()),
+                TestUtils.createVCFHeader(),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
-                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES,
                 6,
-                3);
+                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES);
         } catch (final PgenJniException e) {
             Assert.assertNotNull(e.getMessage().contains("kPglRetOpenFail"));
             throw e;
@@ -51,10 +52,11 @@ public class PgenWriteTest {
         try (final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false);
              final PgenWriter writer = new PgenWriter(
                     new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
+                    vcfMetaData.vcfHeader(),
                     PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
-                    PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES,
                     vcfMetaData.nVariants(),
-                    vcfMetaData.nSamples())) {
+                    PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES
+                    )) {
                 reader.forEach(vc -> writer.add(vc));
             }
 
@@ -101,11 +103,6 @@ public class PgenWriteTest {
         // first, convert the test VCF to pgen twice, once using the PgenWriter and once using plink2
         final TestUtils.PgenFileSet jniFileSet = TestUtils.vcfToPgen_jni(originalVCF, pgenWriteMode, compressPGEN);
         final TestUtils.PgenFileSet plink2FileSet = TestUtils.vcfToPgen_plink2(originalVCF, compressPGEN);
-
-        //TODO: remove this when .pvar/.psam writing are implemented
-        // propagate the contents of the plink2-generated .pvar and .psam for now, since generating those isn't implemented
-        // yet, and plink2 needs them to do the round-trip back to VCF)
-        TestUtils.copyPGENCompanionFiles(plink2FileSet, jniFileSet);
 
         // now, use plink2 to reconvert both of the pgens back into VCFs
         final Path vcfFromPGEN_jni = TestUtils.pgenToVCF_plink2(jniFileSet, "FromJNI", extraPlinkArgs, compressPGEN);
@@ -162,11 +159,12 @@ public class PgenWriteTest {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
+                TestUtils.createVCFHeader(),
                  // use write and copy mode here so we don't have to clean up the temp file when we abort artificially
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY,
-                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES,
                 6, // claim we'll write 6 variants, but don't write them
-                3)) {
+                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES
+            )) {
          } catch (final PgenJniException e) {
             Assert.assertTrue(e.getMessage().contains("number of written variants"));
             throw e;
@@ -178,10 +176,10 @@ public class PgenWriteTest {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
+                TestUtils.createVCFHeader(),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
-                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES, 
                 6,
-                3)) {
+                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES)) {
                     final List<Allele> alleles = List.of(
                         Allele.REF_A, Allele.ALT_C, Allele.ALT_G
                     );
@@ -202,10 +200,10 @@ public class PgenWriteTest {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest", false);
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
+                TestUtils.createVCFHeader(),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
-                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES + 1, 
                 6,
-                3)) {
+                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES + 1)) {
          } catch (final PgenJniException e) {
             Assert.assertTrue(e.getMessage().contains("exceeds the supported pgen max"));
             throw e;
