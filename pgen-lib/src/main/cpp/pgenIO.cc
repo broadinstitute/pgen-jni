@@ -12,6 +12,7 @@ using namespace std;
 namespace pgenlib {
 
     plink2::PgenWriteMode validatePgenWriteMode(const uint32_t anInt);
+    static const int kErrMessageBufSize = 1024;
 
     //TODO: should we use variant_ct_limit instead of requiring the variant count to be known up front ?
     // Since we need to keep this code in sync with the plink2 pgenlib code, try to use variable names that match
@@ -19,11 +20,20 @@ namespace pgenlib {
     PgenContext *openPgen(
             const char* cFilename,
             const int pgenWriteModeInt,
-            const long numberOfVariants,
+            const long variantCount,
             const int sampleCount) {
 
-        // validate the requested pgen write mode
+        // validate the requested pgen write mode, and sample and variant counts
         plink2::PgenWriteMode pgenWriteMode = validatePgenWriteMode(pgenWriteModeInt);
+        if (sampleCount < 1) {
+            char errMessageBuff[kErrMessageBufSize];
+            snprintf(errMessageBuff, kErrMessageBufSize, "Invalid sample count: %d. At least 1 sample is required.", sampleCount);
+            throw PgenException(errMessageBuff);
+        } else if (variantCount < 1) {
+            char errMessageBuff[kErrMessageBufSize];
+            snprintf(errMessageBuff, kErrMessageBufSize, "Invalid variant count: %ld. At least 1 variant is required.", variantCount);
+            throw PgenException(errMessageBuff);
+        }
 
         PgenContext* pGenContext = static_cast<PgenContext *const>(malloc(sizeof(PgenContext)));
         if (pGenContext == nullptr) {
@@ -37,7 +47,7 @@ namespace pgenlib {
         //TODO: fix this type
         pGenContext->sampleCount = static_cast<uint32_t>(sampleCount);
 
-        //TODO: fix these types, plink2::DivUp takes two uintptr_t, which are long on Mac
+        //TODO: fix these types, plink2::DivUp(uintptr_t val, uint32_t divisor) which are long on Mac
         uint32_t bitvec_cacheline_ct = plink2::DivUp(sampleCount, plink2::kBitsPerCacheline);
 
         //    if nonref_flags is not None:
@@ -71,10 +81,24 @@ namespace pgenlib {
         //      raise RuntimeError("SpgwInitPhase1() error " + str(reterr))
         uintptr_t alloc_cacheline_ct = 0;
         uint32_t max_vrec_len;
-        const plink2::PglErr init1Result = plink2::SpgwInitPhase1(cFilename, //filename
+//        PglErr SpgwInitPhase1(
+//                const char* __restrict fname,
+//                const uintptr_t* __restrict allele_idx_offsets,
+//                uintptr_t* __restrict explicit_nonref_flags,
+//                uint32_t variant_ct_limit,
+//                uint32_t sample_ct,
+//                uint32_t allele_ct_upper_bound,
+//                PgenWriteMode write_mode,
+//                PgenGlobalFlags phase_dosage_gflags,
+//                uint32_t nonref_flags_storage,
+//                STPgenWriter* spgwp,
+//                uintptr_t* alloc_cacheline_ct_ptr,
+//                uint32_t* max_vrec_len_ptr)
+
+            const plink2::PglErr init1Result = plink2::SpgwInitPhase1(cFilename, //filename
                                                                   nullptr,  // allele index offsets ( for multi allele)
                                                                   nullptr,  // non-ref flags
-                                                                  static_cast<uint32_t>(numberOfVariants), // number of variants
+                                                                  static_cast<uint32_t>(variantCount), // number of variants
                                                                   pGenContext->sampleCount, // sample count
                                                                   0, // optional max allele count
                                                                   pgenWriteMode,

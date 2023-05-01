@@ -18,10 +18,10 @@ constexpr int TMP_FILENAME_SIZE = 4096;
 template<size_t N> void createTempFile(const char* const nameTemplate, char (&outputFileName)[N]);
 void generate_random_allele_codes(int32_t* const allele_codes, const int n_samples, const int n_alleles);
 long test_write_unphased_pgen(
-        const long n_variants,
-        const int n_samples,
+        const int32_t* const allele_codes,
         const int pgen_file_mode,
-        const int32_t* const allele_codes);
+        const long n_variants,
+        const int n_samples);
 // integer constants to parallel PgenFileMode, for use when calling jni callable functions, which can't
 // use the PgenFileMode enum provided by plink2
 constexpr int PGEN_FILE_MODE_BACKWARD_SEEK = static_cast<int>(plink2::PgenWriteMode::kPgenWriteBackwardSeek);
@@ -66,7 +66,7 @@ BOOST_DATA_TEST_CASE(test_write_unphased_biallelic_small, s_pgenFileMode) {
     constexpr int32_t allele_codes[] {0, 0, 0, 1, 1, 1 };
     // don't be fooled by the reference to the variable "sample" below; its a variable name introduced by
     // the boost macro to refer to the parameter for the test case, which in this test is the pgen file mode...
-    test_write_unphased_pgen(n_variants, n_samples, sample, allele_codes);
+    test_write_unphased_pgen(allele_codes, sample, n_variants, n_samples);
     // ignore the file size, since it varies with the file mode
 }
 
@@ -78,7 +78,7 @@ BOOST_AUTO_TEST_CASE(test_write_unphased_biallelic_large) {
     // one variants's worth of allele codes drawn from 2 alleles
     int32_t *allele_codes = new int32_t[n_samples * 2];
     generate_random_allele_codes(allele_codes, n_samples, n_alleles);
-    const long file_size = test_write_unphased_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes);
+    const long file_size = test_write_unphased_pgen(allele_codes, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples);
     delete[] allele_codes;
 
     //TODO: hm - for some reason, the file is 350028 on my Mac, but is 353340 on CI/linux
@@ -93,7 +93,7 @@ BOOST_AUTO_TEST_CASE(test_write_unphased_multi_allelic_large) {
     // synthesize one variants's worth of allele codes, with genotypes randomly drawn from 7 allele codes
     int32_t *allele_codes = new int32_t[n_samples * 2];
     generate_random_allele_codes(allele_codes, n_samples, n_alleles);
-    const long file_size = test_write_unphased_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes);
+    const long file_size = test_write_unphased_pgen(allele_codes, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples);
     delete[] allele_codes;
 
     //TODO: hm - for some reason, the file is 350028 on my Mac, but is 353340 on CI/linux
@@ -107,7 +107,7 @@ BOOST_AUTO_TEST_CASE(test_write_bad_allele_code) {
     constexpr int32_t allele_codes[] {0, 0, 0, -17, 0, 0 };
     const char* const expectedMessageFragment = "Attempt to append invalid allele code";
     BOOST_REQUIRE_EXCEPTION(
-            test_write_unphased_pgen(n_variants, n_samples, PGEN_FILE_MODE_WRITE_AND_COPY, allele_codes),
+            test_write_unphased_pgen(allele_codes, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples),
             PgenException,
             [expectedMessageFragment](PgenException ex) -> bool {
                 return strstr(ex.what(), expectedMessageFragment);
@@ -152,6 +152,36 @@ BOOST_AUTO_TEST_CASE(test_invalid_write_mode) {
     );
 }
 
+BOOST_AUTO_TEST_CASE(test_invalid_sample_count) {
+    const char* const expectedInvalidSampleCountMessage = "Invalid sample count";
+    char tmpFileName[TMP_FILENAME_SIZE];
+    createTempFile("test_write.pgen", tmpFileName);
+    unlink(tmpFileName);
+    const int invalidSampleCount = 0; // must be >= 1
+    BOOST_REQUIRE_EXCEPTION(
+            pgenlib::openPgen(tmpFileName, 1, 10L, invalidSampleCount),
+            PgenException,
+            [expectedInvalidSampleCountMessage](PgenException ex) -> bool  {
+                return strstr(ex.what(), expectedInvalidSampleCountMessage);
+            }
+    );
+}
+
+BOOST_AUTO_TEST_CASE(test_invalid_variant_count) {
+    const char* const expectedInvalidVariantCountMessage = "Invalid variant count";
+    char tmpFileName[TMP_FILENAME_SIZE];
+    createTempFile("test_write.pgen", tmpFileName);
+    unlink(tmpFileName);
+    const long invalidVariantCount = 0; // must be >= 1
+    BOOST_REQUIRE_EXCEPTION(
+            pgenlib::openPgen(tmpFileName, 1, invalidVariantCount, 3),
+            PgenException,
+            [expectedInvalidVariantCountMessage](PgenException ex) -> bool  {
+                return strstr(ex.what(), expectedInvalidVariantCountMessage);
+            }
+    );
+}
+
 //******************* Local Test Utilities *******************
 
 // generate random allele codes, drawn from n_alleles, for n_samples
@@ -188,10 +218,10 @@ void createTempFile(const char* const nameTemplate, char (&outputFileName)[N]) {
 // write a (unphased) pGEN file given allele codes (the same allele code vector is used for each variant),
 // given # of variants, # of samples, and write mode
 long test_write_unphased_pgen(
-        const long n_variants,
-        const int n_samples,
+        const int32_t *allele_codes,
         const int pgen_file_mode,
-        const int32_t *allele_codes) {
+        const long n_variants,
+        const int n_samples) {
     char tmp_file_name[TMP_FILENAME_SIZE];
     createTempFile("test_write.pgen", tmp_file_name);
 
