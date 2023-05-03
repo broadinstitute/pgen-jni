@@ -55,10 +55,10 @@ Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv* env, jclass object
 }
 
 JNIEXPORT void JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_closePgen (JNIEnv * env, jclass object, jlong pgenHandle){
+Java_org_broadinstitute_pgen_PgenWriter_closePgen (JNIEnv * env, jclass object, jlong pgenHandle, jlong droppedVariantCount) {
     PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
     try {
-        closePgen(pgenContext);
+        closePgen(pgenContext, droppedVariantCount);
     } catch (PgenException& e) {
         reThrowAsJavaException(env, e, "Native code failure closing pgen context");
     }

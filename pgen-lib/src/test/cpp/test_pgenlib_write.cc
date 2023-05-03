@@ -100,24 +100,9 @@ BOOST_AUTO_TEST_CASE(test_write_unphased_multi_allelic_large) {
     //BOOST_REQUIRE_EQUAL(file_size, 350028); // cause thats what it is
 }
 
-BOOST_AUTO_TEST_CASE(test_write_bad_allele_code) {
-    constexpr long n_variants = 6;
-    constexpr int n_samples = 3;
-    // one variants's worth of allele codes - 2 alleles over 3 samples, with on bad allele code
-    constexpr int32_t allele_codes[] {0, 0, 0, -17, 0, 0 };
-    const char* const expectedMessageFragment = "Attempt to append invalid allele code";
-    BOOST_REQUIRE_EXCEPTION(
-            test_write_unphased_pgen(allele_codes, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples),
-            PgenException,
-            [expectedMessageFragment](PgenException ex) -> bool {
-                return strstr(ex.what(), expectedMessageFragment);
-            }
-    );
-}
-
 // say we're going to write 10 variants, but don't write them
 BOOST_AUTO_TEST_CASE(test_close_with_no_writes) {
-    const char* const expectedNoWriteMessage = "number of written variants";
+    const char* const expectedNoWriteMessage = "closePgen called with number of variants written";
     char tmpFileName[TMP_FILENAME_SIZE];
     createTempFile("test_write.pgen", tmpFileName);
     const pgenlib::PgenContext *const pgenContext = pgenlib::openPgen(
@@ -128,10 +113,25 @@ BOOST_AUTO_TEST_CASE(test_close_with_no_writes) {
     BOOST_REQUIRE_NE(pgenContext, nullptr);
     unlink(tmpFileName);
     BOOST_REQUIRE_EXCEPTION(
-            closePgen(pgenContext),
+            closePgen(pgenContext, 0),
             PgenException,
             [expectedNoWriteMessage](PgenException ex) -> bool  {
                 return strstr(ex.what(), expectedNoWriteMessage);
+            }
+    );
+}
+
+BOOST_AUTO_TEST_CASE(test_invalid_allele_code) {
+    constexpr long n_variants = 6;
+    constexpr int n_samples = 3;
+    // one variants's worth of allele codes - 2 alleles over 3 samples, with on bad allele code
+    constexpr int32_t allele_codes[] {0, 0, 0, -17, 0, 0 };
+    const char* const expectedMessageFragment = "Attempt to append invalid allele code";
+    BOOST_REQUIRE_EXCEPTION(
+            test_write_unphased_pgen(allele_codes, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples),
+            PgenException,
+            [expectedMessageFragment](PgenException ex) -> bool {
+                return strstr(ex.what(), expectedMessageFragment);
             }
     );
 }
@@ -235,7 +235,7 @@ long test_write_unphased_pgen(
     for (int i = 0; i < n_variants; i++) {
         pgenlib::appendAlleles(pgen_context, allele_codes);
     }
-    closePgen(pgen_context);
+    closePgen(pgen_context, 0);
 
     // for now, just validate that the file has SOME contents; the enclosing pgen project has test code
     // that verifies the contents using plink2

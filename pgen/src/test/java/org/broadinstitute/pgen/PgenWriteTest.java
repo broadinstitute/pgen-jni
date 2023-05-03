@@ -158,49 +158,81 @@ public class PgenWriteTest {
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 TestUtils.createVCFHeader(),
-                 // use write and copy mode here so we don't have to clean up the temp file when we abort artificially
+                 // use PGEN_FILE_MODE_WRITE_AND_COPY mode here so we don't have to clean up the temp file when we abort artificially
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY,
                 6, // claim we'll write 6 variants, but don't write them
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES
             )) {
          } catch (final PgenJniException e) {
-            Assert.assertTrue(e.getMessage().contains("number of written variants"));
+            Assert.assertTrue(e.getMessage().contains("number of variants written"));
             throw e;
          }
     }
 
+    // reject non-diploid variants
     @Test(expectedExceptions = PgenJniException.class)
     public void testRejectNonDiploid() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest");
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("rejectNonDiploid");
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 TestUtils.createVCFHeader(),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
                 6,
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES)) {
-                    final List<Allele> alleles = List.of(
-                        Allele.REF_A, Allele.ALT_C, Allele.ALT_G
-                    );
-                    final VariantContextBuilder vcb = new VariantContextBuilder("test", "chr1", 1, 1, alleles);
-                    final VariantContext ploidy3VC = vcb.genotypes(
-                        List.of(new GenotypeBuilder().name("s1").alleles(alleles).make())
-                    ).make();
-                    Assert.assertEquals(ploidy3VC.getMaxPloidy(2), 3);
-                    pgenWriter.add(ploidy3VC);
+            final List<Allele> alleles = List.of(Allele.REF_A, Allele.ALT_C, Allele.ALT_G);
+            final VariantContextBuilder vcb = new VariantContextBuilder("test", "chr1", 1, 1, alleles);
+            final VariantContext ploidy3VC = vcb.genotypes(
+                List.of(new GenotypeBuilder().name("s1").alleles(alleles).make())
+            ).make();
+            Assert.assertEquals(ploidy3VC.getMaxPloidy(2), 3);
+            pgenWriter.add(ploidy3VC);
          } catch (final PgenJniException e) {
             Assert.assertTrue(e.getMessage().contains("ploidy = 3"));
             throw e;
          }
     }
 
+    // verify that we really do drop variants that exceed the maximum alterate allele threshold
+    @Test
+    public void testRejectTooManyAltAlleles() throws IOException {
+        final int ARTIFICALLY_LOW_MAX_ALLELE_THRESHOLD = 3;
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("tooManyAltAlelesTest");
+ 
+        final TestUtils.VcfMetaData vcfMetaData = TestUtils.getVcfMetaData(Paths.get("testdata/CEUtrioTest.vcf"));
+        try (final PgenWriter pgenWriter = new PgenWriter(
+                new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
+                vcfMetaData.vcfHeader(),
+                PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
+                vcfMetaData.nVariants() + 1, // add one to account for the synthetic variant that we add that gets dropped
+                ARTIFICALLY_LOW_MAX_ALLELE_THRESHOLD)) {
+
+            try (final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false)) {
+                reader.forEach(vc -> pgenWriter.add(vc));
+            }
+
+            Assert.assertEquals(pgenWriter.getWrittenVariantCount(), vcfMetaData.nVariants());
+            Assert.assertEquals(pgenWriter.getDroppedVariantCount(), 0);
+
+            // now write a variant that should get dropped due to exceeding the artifically low max allele threshold we set above
+            final List<Allele> alleles = List.of(Allele.REF_A, Allele.ALT_C, Allele.ALT_G, Allele.ALT_T);
+            final VariantContextBuilder vcb = new VariantContextBuilder("test", "chr1", 1, 1, alleles);
+            final VariantContext tooManyAlleles = vcb.genotypes(List.of(new GenotypeBuilder().name("s1").alleles(alleles).make())).make();
+            pgenWriter.add(tooManyAlleles);
+
+            Assert.assertEquals(pgenWriter.getDroppedVariantCount(), 1);    
+         }
+    }
+
+    // verify that we reject attempts to set a max alternate allele threshold that exceeds plink2 maximum
     @Test(expectedExceptions = PgenJniException.class)
-    public void testRequestedMaxAltAllelesExceeded() throws IOException {
+    public void testRejectRequestedMaxAltAllelesExceedsPlinkMax() throws IOException {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("maxAltAlelesTest");
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 TestUtils.createVCFHeader(),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
                 6,
+                // add one to plink's max to be certain we exceed the limit
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES + 1)) {
          } catch (final PgenJniException e) {
             Assert.assertTrue(e.getMessage().contains("exceeds the supported pgen max"));

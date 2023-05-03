@@ -328,23 +328,35 @@ namespace pgenlib {
 //      return
     }
 
-    void closePgen(const PgenContext *const pGenContext) {
+    void closePgen(const PgenContext *const pGenContext, const long numVariantsDropped) {
         const uint32_t declaredVariantCt = plink2::SpgwGetVariantCt(pGenContext->spgwp);
         const uint32_t writtenVariantCt = plink2::SpgwGetVidx(pGenContext->spgwp);
-        if (declaredVariantCt != writtenVariantCt) {
-             snprintf(reservedForExceptionMessage,
-                    kReservedMessageBufSize,
-                    "PgenWriter.closePgen() called when number of written variants (%d) not equal to initially declared value (%d)",
-                    writtenVariantCt,
-                    declaredVariantCt);
+        const uint32_t droppedVariantCt = static_cast<uint32_t>(numVariantsDropped);
+
+        if ((declaredVariantCt - droppedVariantCt) != writtenVariantCt) {
+            //TODO: the plink2 python implementation throws on close if you haven't written as many variants as you
+            // initially claimed you would, so we do too (after accounting for variants dropped due to exceeding the
+            // maximum allele threshold). but we've come this far - do we REALLY want to throw now ???
+            char errMessage[kErrMessageBufSize];
+            snprintf(reservedForExceptionMessage,
+                     kErrMessageBufSize,
+                      "closePgen called with number of variants written (%d) not equal to (declared - dropped)  (%d - %d = %d)",
+                      writtenVariantCt,
+                      declaredVariantCt,
+                      droppedVariantCt,
+                      declaredVariantCt - droppedVariantCt);
             throw PgenException(reservedForExceptionMessage);
         }
 
         throwOnPglErr(SpgwFinish(pGenContext->spgwp), "Error closing pgen file: SpgwFinish");
+
+        //TODO: there might be a bug in plink pgen-lib, since I think the plink2 VCF importer only does one or the
+        // other of SpgwFinish and CleanupSpgw (SpgwFinish on success, CleanupSpgw on failure), but not both. but
+        // if we don't do both, the output doesn't seem to get flushed...
         plink2::PglErr cleanupErr;
         plink2::BoolErr bErr = CleanupSpgw(pGenContext->spgwp, &cleanupErr);
         if (bErr) {
-            throwOnPglErr(cleanupErr, "Error cleaning up pgen file: CleanupSpgw");
+            throwOnPglErr(cleanupErr, "Error cleaning up on pgen close: CleanupSpgw");
         }
     }
 

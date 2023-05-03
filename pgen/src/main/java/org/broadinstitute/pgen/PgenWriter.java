@@ -4,6 +4,7 @@
 package org.broadinstitute.pgen;
 
 import htsjdk.io.HtsPath;
+import htsjdk.samtools.util.Log;
 import htsjdk.samtools.util.RuntimeIOException;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
@@ -27,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 
 public class PgenWriter implements VariantContextWriter {
+    private static Log logger = Log.getInstance(PgenWriter.class);
+
     public static final int PLINK2_NO_CALL_VALUE = -9;
     public static final int PLINK2_MAX_ALTERNATE_ALLELES = 255;
 
@@ -52,13 +55,16 @@ public class PgenWriter implements VariantContextWriter {
     private long pgenContextHandle;
     private ByteBuffer alleleBuffer;
     private VariantContextWriter pVarWriter;
+    private long expectedVariantCount = 0L;
+    private long writtenVariantCount =  0L;
+    private long droppedVariantCount = 0L;
     // private long multiallelic_ct = 0;
     // private long nonSNP_ct = 0;
     // private long mnp_ct = 0;
 
      // native JNI methods
      private static native long openPgen(String file, int pgenWriteModeInt, long numberOfVariants, int numberOfSamples);
-     private static native void closePgen(long pgenContextHandle);
+     private static native void closePgen(long pgenContextHandle, long numDroppedVariants);
      private static native void appendAlleles(long pgenContextHandle, ByteBuffer alleles);
      private static native ByteBuffer createBuffer(int length);
      private static native void destroyByteBuffer(ByteBuffer buffer);
@@ -89,6 +95,7 @@ public class PgenWriter implements VariantContextWriter {
                     PLINK2_MAX_ALTERNATE_ALLELES));
         }
         this.maxAltAlleles = maxAltAlleles;
+        this.expectedVariantCount = numberOfVariants;
 
         pgenContextHandle = openPgen(pgenFile.getRawInputString(), pgenWriteMode.value(), numberOfVariants, vcfHeader.getNGenotypeSamples());
         alleleBuffer = createBuffer(vcfHeader.getNGenotypeSamples()*2*4); //samples * ploidy * bytes in int32
@@ -116,7 +123,10 @@ public class PgenWriter implements VariantContextWriter {
         pVarWriter.close();
         pVarWriter = null;
 
-        closePgen(pgenContextHandle);
+        // tell the writer how many variants we dropped (due to exceeding the # of alternate alleles) so it
+        // doesn't throw if the number written doesn't match the number expected (which is provided when the
+        // writer is opened)
+        closePgen(pgenContextHandle, droppedVariantCount);
         pgenContextHandle = 0;
 
         destroyByteBuffer(alleleBuffer);
@@ -126,17 +136,6 @@ public class PgenWriter implements VariantContextWriter {
     @Override
     public boolean checkError() {
         return false;
-    }
-
-    private static Map<Allele, Integer> buildAlleleMap(final VariantContext vc) {
-        final Map<Allele, Integer> alleleMap = new HashMap<>(vc.getAlleles().size() + 1);
-        alleleMap.put(Allele.NO_CALL, PLINK2_NO_CALL_VALUE); // convenience for lookup
-        final List<Allele> alleles = vc.getAlleles();
-        for (int i = 0; i < alleles.size(); i++) {
-            alleleMap.put(alleles.get(i), i);
-        }
-
-        return alleleMap;
     }
 
     @Override
@@ -151,6 +150,11 @@ public class PgenWriter implements VariantContextWriter {
         //     mnp_ct++;
         // }
 
+        if (vc.getNAlleles() > maxAltAlleles) {
+            droppedVariantCount++;
+            return;
+        }
+        
         //reset buffer
         alleleBuffer.clear();
         final Map<Allele, Integer> alleleMap = buildAlleleMap(vc);
@@ -159,14 +163,22 @@ public class PgenWriter implements VariantContextWriter {
             if (g.getPloidy() != 2) {
                 throw new PgenJniException(
                     "PGEN only supports diploid samples and we see one with ploidy = " + g.getPloidy()
-                        + " at line " + vc.toStringDecodeGenotypes());
+                        + " at line " + vc.toStringWithoutGenotypes());
             }
             for (final Allele allele : g.getAlleles()) {
                 final Integer mapping = alleleMap.get(allele);
                 try {
                     alleleBuffer.putInt(mapping);
-                } catch (BufferOverflowException e){
-                    throw new RuntimeException("Buffer overflow for: " + mapping +" for  Allele: " + allele.toString() + " from Genotype: " + g.toString() + " at buffer position: "+ alleleBuffer.position());
+                } catch (final BufferOverflowException e) {
+                    throw new RuntimeException(
+                        String.format(
+                            "Buffer overflow at position: %d mapping: %d for variant: %s, genotype: %s allele: %s",
+                            alleleBuffer.position(),
+                            mapping,
+                            vc.toStringWithoutGenotypes(),
+                            g.toString(),
+                            allele.toString()),
+                        e);
                 }
             }
         }
@@ -177,9 +189,20 @@ public class PgenWriter implements VariantContextWriter {
         alleleBuffer.rewind();
         appendAlleles(pgenContextHandle, alleleBuffer);
 
-        // add the VC to pvar
+        // add the VC to pvar and increment our write count
         pVarWriter.add(vc);
+        writtenVariantCount++;
     }
+
+    /**
+     * @return the number of variants dropped due to exceeding the max alternate allele count
+     */
+    public long getDroppedVariantCount() { return droppedVariantCount; }
+
+    /**
+     * @return the number of variants actually written to the pgen
+     */
+    public long getWrittenVariantCount() { return writtenVariantCount; }
 
     // given a Path, return the absolute path of the file, without the trailing extension
     public static String getAbsoluteFileNameWithoutExtension(final Path targetPath, final String extension) {
@@ -220,7 +243,6 @@ public class PgenWriter implements VariantContextWriter {
             // in the pgen back to the VCF. So if we don't preserve the order in the .psam, the genotypes in the roundtripped VCF
             // won't match the original VCF (and will be incorrect).
             for (final String sampleName : vcfHeader.getGenotypeSamples()) {
-                final StringBuilder s = new StringBuilder();
                 psamWriter.write(sampleName);
                 psamWriter.write(PSAM_DETAIL_LINE);
             }
@@ -228,6 +250,17 @@ public class PgenWriter implements VariantContextWriter {
             throw new RuntimeIOException(String.format("Error writing the .psam file %s", pSamFile.getRawInputString()), e);
         }
         return pSamFile;
+    }
+
+    private static Map<Allele, Integer> buildAlleleMap(final VariantContext vc) {
+        final Map<Allele, Integer> alleleMap = new HashMap<>(vc.getAlleles().size() + 1);
+        alleleMap.put(Allele.NO_CALL, PLINK2_NO_CALL_VALUE); // convenience for lookup
+        final List<Allele> alleles = vc.getAlleles();
+        for (int i = 0; i < alleles.size(); i++) {
+            alleleMap.put(alleles.get(i), i);
+        }
+
+        return alleleMap;
     }
 
 }
