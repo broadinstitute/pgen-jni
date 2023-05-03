@@ -360,8 +360,8 @@ namespace pgenlib {
         }
     }
 
-    long getWrittenVariantCount(const PgenContext *const pGenContext) {
-        return SpgwGetVariantCt(pGenContext->spgwp);
+    long getNumberOfVariantsWritten(const PgenContext *const pGenContext) {
+        return plink2::SpgwGetVidx(pGenContext->spgwp);
     }
 
     plink2::PgenWriteMode validatePgenWriteMode(const uint32_t pgenWriteModeInt) {

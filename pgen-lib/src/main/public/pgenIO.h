@@ -10,7 +10,7 @@ namespace pgenlib {
     PgenContext *openPgen(const char *cFilename, const int pgenWriteModeInt, const long variantCount, const int sampleCount);
     void appendAlleles(const PgenContext *const pGenContext, const int32_t* allele_codes );
     void closePgen(const PgenContext *const pGenContext, const long nDroppedVariants);
-    long getWrittenVariantCount(const PgenContext *const pGenContext);
+    long getNumberOfVariantsWritten(const PgenContext *const pGenContext);
 
 }
 #endif //PGEN_LIB_PGENIO_H

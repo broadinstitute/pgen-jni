@@ -247,7 +247,7 @@ long test_write_unphased_pgen(
     for (int i = 0; i < n_variants; i++) {
         pgenlib::appendAlleles(pgen_context, allele_codes);
     }
-    variantCount = getWrittenVariantCount(pgen_context);
+    variantCount = getNumberOfVariantsWritten(pgen_context);
     closePgen(pgen_context, 0);
 
     // for now, just validate that the file has SOME contents; the enclosing pgen project has test code

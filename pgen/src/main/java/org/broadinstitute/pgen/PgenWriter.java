@@ -56,7 +56,6 @@ public class PgenWriter implements VariantContextWriter {
     private ByteBuffer alleleBuffer;
     private VariantContextWriter pVarWriter;
     private long expectedVariantCount = 0L;
-    private long writtenVariantCount =  0L;
     private long droppedVariantCount = 0L;
     // private long multiallelic_ct = 0;
     // private long nonSNP_ct = 0;
@@ -68,7 +67,7 @@ public class PgenWriter implements VariantContextWriter {
     /**
      * @return the number of variants actually written to the pgen
      */
-    private static native long getWrittenVariantCount();
+    private static native long getPgenVariantCount(long pgenContextHandle);
     private static native void appendAlleles(long pgenContextHandle, ByteBuffer alleles);
     private static native ByteBuffer createBuffer(int length);
     private static native void destroyByteBuffer(ByteBuffer buffer);
@@ -193,15 +192,21 @@ public class PgenWriter implements VariantContextWriter {
         alleleBuffer.rewind();
         appendAlleles(pgenContextHandle, alleleBuffer);
 
-        // add the VC to pvar and increment our write count
+        // add the VC to pvar
         pVarWriter.add(vc);
-        writtenVariantCount++;
     }
 
-    /**
+   /**
      * @return the number of variants dropped due to exceeding the max alternate allele count
      */
     public long getDroppedVariantCount() { return droppedVariantCount; }
+
+     /**
+     * @return the number of variants actually written to the pgen
+     * 
+     * Delegate to the pgen-lib code to get the actual number recorded by the pgen library code.
+     */
+    public long getWrittenVariantCount() { return getPgenVariantCount(pgenContextHandle); }
 
     // given a Path, return the absolute path of the file, without the trailing extension
     public static String getAbsoluteFileNameWithoutExtension(final Path targetPath, final String extension) {

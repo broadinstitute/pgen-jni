@@ -219,6 +219,7 @@ public class PgenWriteTest {
             final VariantContext tooManyAlleles = vcb.genotypes(List.of(new GenotypeBuilder().name("s1").alleles(alleles).make())).make();
             pgenWriter.add(tooManyAlleles);
 
+            Assert.assertEquals(pgenWriter.getWrittenVariantCount(), vcfMetaData.nVariants());
             Assert.assertEquals(pgenWriter.getDroppedVariantCount(), 1);    
          }
     }

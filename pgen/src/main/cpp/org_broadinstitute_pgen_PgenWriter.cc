@@ -55,7 +55,7 @@ Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv* env, jclass object
 }
 
 JNIEXPORT void JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_closePgen (JNIEnv * env, jclass object, jlong pgenHandle, jlong droppedVariantCount) {
+Java_org_broadinstitute_pgen_PgenWriter_closePgen(JNIEnv * env, jclass object, jlong pgenHandle, jlong droppedVariantCount) {
     PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
     try {
         closePgen(pgenContext, droppedVariantCount);
@@ -64,10 +64,11 @@ Java_org_broadinstitute_pgen_PgenWriter_closePgen (JNIEnv * env, jclass object, 
     }
 }
 
-JNIEXPORT long JNICALL
-public long Java_org_broadinstitute_pgen_PgenWriter_getWrittenVariantCount() {
+JNIEXPORT jlong JNICALL
+Java_org_broadinstitute_pgen_PgenWriter_getPgenVariantCount(JNIEnv * env, jclass object, jlong pgenHandle) {
     PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
-    return getWrittenVariantCount(pgenContext);
+    const long varCount = getNumberOfVariantsWritten(pgenContext);
+    return varCount;
 }
 
 JNIEXPORT jobject JNICALL
