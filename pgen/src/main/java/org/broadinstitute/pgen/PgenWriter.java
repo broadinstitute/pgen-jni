@@ -62,12 +62,16 @@ public class PgenWriter implements VariantContextWriter {
     // private long nonSNP_ct = 0;
     // private long mnp_ct = 0;
 
-     // native JNI methods
-     private static native long openPgen(String file, int pgenWriteModeInt, long numberOfVariants, int numberOfSamples);
-     private static native void closePgen(long pgenContextHandle, long numDroppedVariants);
-     private static native void appendAlleles(long pgenContextHandle, ByteBuffer alleles);
-     private static native ByteBuffer createBuffer(int length);
-     private static native void destroyByteBuffer(ByteBuffer buffer);
+    // native JNI methods
+    private static native long openPgen(String file, int pgenWriteModeInt, long numberOfVariants, int numberOfSamples);
+    private static native void closePgen(long pgenContextHandle, long numDroppedVariants);
+    /**
+     * @return the number of variants actually written to the pgen
+     */
+    private static native long getWrittenVariantCount();
+    private static native void appendAlleles(long pgenContextHandle, ByteBuffer alleles);
+    private static native ByteBuffer createBuffer(int length);
+    private static native void destroyByteBuffer(ByteBuffer buffer);
 
      static {
         System.loadLibrary("pgen");
@@ -198,11 +202,6 @@ public class PgenWriter implements VariantContextWriter {
      * @return the number of variants dropped due to exceeding the max alternate allele count
      */
     public long getDroppedVariantCount() { return droppedVariantCount; }
-
-    /**
-     * @return the number of variants actually written to the pgen
-     */
-    public long getWrittenVariantCount() { return writtenVariantCount; }
 
     // given a Path, return the absolute path of the file, without the trailing extension
     public static String getAbsoluteFileNameWithoutExtension(final Path targetPath, final String extension) {

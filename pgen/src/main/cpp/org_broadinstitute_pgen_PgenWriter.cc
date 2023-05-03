@@ -64,6 +64,12 @@ Java_org_broadinstitute_pgen_PgenWriter_closePgen (JNIEnv * env, jclass object, 
     }
 }
 
+JNIEXPORT long JNICALL
+public long Java_org_broadinstitute_pgen_PgenWriter_getWrittenVariantCount() {
+    PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
+    return getWrittenVariantCount(pgenContext);
+}
+
 JNIEXPORT jobject JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_createBuffer( JNIEnv* env, jclass cls, jint length ) {
     void* buf = malloc(length);

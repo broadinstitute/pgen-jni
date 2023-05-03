@@ -21,7 +21,8 @@ long test_write_unphased_pgen(
         const int32_t* const allele_codes,
         const int pgen_file_mode,
         const long n_variants,
-        const int n_samples);
+        const int n_samples,
+        long &writtenVariantCount);
 // integer constants to parallel PgenFileMode, for use when calling jni callable functions, which can't
 // use the PgenFileMode enum provided by plink2
 constexpr int PGEN_FILE_MODE_BACKWARD_SEEK = static_cast<int>(plink2::PgenWriteMode::kPgenWriteBackwardSeek);
@@ -64,10 +65,13 @@ BOOST_DATA_TEST_CASE(test_write_unphased_biallelic_small, s_pgenFileMode) {
     constexpr int n_samples = 3;
     // one variants's worth of allele codes - 2 alleles over 3 samples
     constexpr int32_t allele_codes[] {0, 0, 0, 1, 1, 1 };
+    long variantCount = 0L;
     // don't be fooled by the reference to the variable "sample" below; its a variable name introduced by
     // the boost macro to refer to the parameter for the test case, which in this test is the pgen file mode...
-    test_write_unphased_pgen(allele_codes, sample, n_variants, n_samples);
-    // ignore the file size, since it varies with the file mode
+    const long file_size = test_write_unphased_pgen(allele_codes, sample, n_variants, n_samples, variantCount);
+    // only check for non-zero file size, since the file size varies with the file mode
+    BOOST_REQUIRE_NE(file_size, 0);
+    BOOST_REQUIRE_EQUAL(variantCount, n_variants);
 }
 
 // write a larger, bi-allelic pgen, using only file mode PGEN_FILE_MODE_WRITE_AND_COPY
@@ -78,11 +82,15 @@ BOOST_AUTO_TEST_CASE(test_write_unphased_biallelic_large) {
     // one variants's worth of allele codes drawn from 2 alleles
     int32_t *allele_codes = new int32_t[n_samples * 2];
     generate_random_allele_codes(allele_codes, n_samples, n_alleles);
-    const long file_size = test_write_unphased_pgen(allele_codes, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples);
+    long variantCount = 0L;
+    const long file_size = test_write_unphased_pgen(allele_codes, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount);
     delete[] allele_codes;
 
-    //TODO: hm - for some reason, the file is 350028 on my Mac, but is 353340 on CI/linux
-    //BOOST_REQUIRE_EQUAL(file_size, 350028); // cause thats what it is
+    BOOST_REQUIRE_NE(file_size, 0);
+    //TODO: hm - for some reason, the file is 355026 on my Mac, but is ?? on CI/linux
+    //BOOST_REQUIRE_EQUAL(file_size, 355026); // cause thats what it is
+    BOOST_REQUIRE_NE(file_size, 0);
+    BOOST_REQUIRE_EQUAL(variantCount, n_variants);
 }
 
 // write a larger, bi-allelic pgen, using only file mode PGEN_FILE_MODE_WRITE_AND_COPY
@@ -93,11 +101,14 @@ BOOST_AUTO_TEST_CASE(test_write_unphased_multi_allelic_large) {
     // synthesize one variants's worth of allele codes, with genotypes randomly drawn from 7 allele codes
     int32_t *allele_codes = new int32_t[n_samples * 2];
     generate_random_allele_codes(allele_codes, n_samples, n_alleles);
-    const long file_size = test_write_unphased_pgen(allele_codes, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples);
+    long variantCount = 0L;
+    const long file_size = test_write_unphased_pgen(allele_codes, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount);
     delete[] allele_codes;
 
-    //TODO: hm - for some reason, the file is 350028 on my Mac, but is 353340 on CI/linux
-    //BOOST_REQUIRE_EQUAL(file_size, 350028); // cause thats what it is
+    //TODO: hm - for some reason, the file is 936,153,140 on my Mac, but is ?? on CI/linux
+    //BOOST_REQUIRE_EQUAL(file_size, 936153140); // cause thats what it is
+    BOOST_REQUIRE_NE(file_size, 0);
+    BOOST_REQUIRE_EQUAL(variantCount, n_variants);
 }
 
 // say we're going to write 10 variants, but don't write them
@@ -127,8 +138,9 @@ BOOST_AUTO_TEST_CASE(test_invalid_allele_code) {
     // one variants's worth of allele codes - 2 alleles over 3 samples, with on bad allele code
     constexpr int32_t allele_codes[] {0, 0, 0, -17, 0, 0 };
     const char* const expectedMessageFragment = "Attempt to append invalid allele code";
+    long variantCount;
     BOOST_REQUIRE_EXCEPTION(
-            test_write_unphased_pgen(allele_codes, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples),
+            test_write_unphased_pgen(allele_codes, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount),
             PgenException,
             [expectedMessageFragment](PgenException ex) -> bool {
                 return strstr(ex.what(), expectedMessageFragment);
@@ -192,8 +204,7 @@ void generate_random_allele_codes(int32_t* const allele_codes, const int n_sampl
     }
 }
 
-// the caller should call unlink() on the resulting file to cause it to be deleted (careful - if its open
-// it will be deleted on close)
+// the caller should call unlink() on the resulting file to cause it to be deleted
 template<size_t N>
 void createTempFile(const char* const nameTemplate, char (&outputFileName)[N]) {
     //this is deprecated (and maybe a little sketchy), but works nicely to obtain a tmp dir location
@@ -211,7 +222,7 @@ void createTempFile(const char* const nameTemplate, char (&outputFileName)[N]) {
                  strerror(errno));
         throw PgenException(errMessage);
     }
-    // the file is open, so close it, but DON'T call unlink for it to be deleted - leave that to the caller...
+    // the file is open, so close it, but leave the call to unlink so the caller can control when it is deleted
     close(fDesc);
 }
 
@@ -221,7 +232,8 @@ long test_write_unphased_pgen(
         const int32_t *allele_codes,
         const int pgen_file_mode,
         const long n_variants,
-        const int n_samples) {
+        const int n_samples,
+        long &variantCount) {
     char tmp_file_name[TMP_FILENAME_SIZE];
     createTempFile("test_write.pgen", tmp_file_name);
 
@@ -235,6 +247,7 @@ long test_write_unphased_pgen(
     for (int i = 0; i < n_variants; i++) {
         pgenlib::appendAlleles(pgen_context, allele_codes);
     }
+    variantCount = getWrittenVariantCount(pgen_context);
     closePgen(pgen_context, 0);
 
     // for now, just validate that the file has SOME contents; the enclosing pgen project has test code
