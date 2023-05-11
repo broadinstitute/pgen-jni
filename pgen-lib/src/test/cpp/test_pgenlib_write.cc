@@ -16,7 +16,7 @@ using namespace pgenlib;
 //******************* Forward Declarations/Constants *******************
 constexpr int TMP_FILENAME_SIZE = 4096;
 template<size_t N> void createTempFile(const char* const nameTemplate, char (&outputFileName)[N]);
-void generate_random_allele_codes(int32_t* const allele_codes, const int n_samples, const int n_alleles);
+void generate_allele_code_distribution(int32_t* const allele_codes, const int n_samples, const int n_alleles);
 long test_write_unphased_pgen(
         const int32_t* const allele_codes,
         const int pgen_file_mode,
@@ -81,15 +81,12 @@ BOOST_AUTO_TEST_CASE(test_write_unphased_biallelic_large) {
     constexpr int n_alleles = 2;
     // one variants's worth of allele codes drawn from 2 alleles
     int32_t *allele_codes = new int32_t[n_samples * 2];
-    generate_random_allele_codes(allele_codes, n_samples, n_alleles);
+    generate_allele_code_distribution(allele_codes, n_samples, n_alleles);
     long variantCount = 0L;
     const long file_size = test_write_unphased_pgen(allele_codes, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount);
     delete[] allele_codes;
 
-    BOOST_REQUIRE_NE(file_size, 0);
-    //TODO: hm - for some reason, the file is 355026 on my Mac, but is ?? on CI/linux
-    //BOOST_REQUIRE_EQUAL(file_size, 355026); // cause thats what it is
-    BOOST_REQUIRE_NE(file_size, 0);
+    BOOST_REQUIRE_EQUAL(file_size, 125450028); // cause thats what it is
     BOOST_REQUIRE_EQUAL(variantCount, n_variants);
 }
 
@@ -100,14 +97,12 @@ BOOST_AUTO_TEST_CASE(test_write_unphased_multi_allelic_large) {
     constexpr int n_alleles = 7;
     // synthesize one variants's worth of allele codes, with genotypes randomly drawn from 7 allele codes
     int32_t *allele_codes = new int32_t[n_samples * 2];
-    generate_random_allele_codes(allele_codes, n_samples, n_alleles);
+    generate_allele_code_distribution(allele_codes, n_samples, n_alleles);
     long variantCount = 0L;
     const long file_size = test_write_unphased_pgen(allele_codes, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount);
     delete[] allele_codes;
 
-    //TODO: hm - for some reason, the file is 936,153,140 on my Mac, but is ?? on CI/linux
-    //BOOST_REQUIRE_EQUAL(file_size, 936153140); // cause thats what it is
-    BOOST_REQUIRE_NE(file_size, 0);
+    BOOST_REQUIRE_EQUAL(file_size, 911252530); // cause thats what it is
     BOOST_REQUIRE_EQUAL(variantCount, n_variants);
 }
 
@@ -196,11 +191,11 @@ BOOST_AUTO_TEST_CASE(test_invalid_variant_count) {
 
 //******************* Local Test Utilities *******************
 
-// generate random allele codes, drawn from n_alleles, for n_samples
-void generate_random_allele_codes(int32_t* const allele_codes, const int n_samples, const int n_alleles) {
+// generate allele codes for n_samples, distributed across values from n_alleles
+void generate_allele_code_distribution(int32_t* const allele_codes, const int n_samples, const int n_alleles) {
     for (int i = 0; i < (n_samples * 2); i+=2) {
-        allele_codes[i] = rand() % n_alleles;
-        allele_codes[i+1] = rand() % n_alleles;
+        allele_codes[i] = i % n_alleles;
+        allele_codes[i+1] = (i + 1) % n_alleles;
     }
 }
 
