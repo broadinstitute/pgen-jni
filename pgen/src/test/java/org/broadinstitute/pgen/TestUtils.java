@@ -96,7 +96,7 @@ public class TestUtils {
 
     // create a VCFHeader that has at least one sample, since pgen will assert (in a debug build) if the number of samples is 0
     @SuppressWarnings("unchecked")
-    public static VCFHeader createVCFHeader() {
+    public static VCFHeader createSingleSampleVCFHeader() {
         final VCFHeader vcfHeader = new VCFHeader(
             Collections.EMPTY_SET,
             new HashSet<String>() {{
