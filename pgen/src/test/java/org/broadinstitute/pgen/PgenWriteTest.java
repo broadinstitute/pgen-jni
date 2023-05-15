@@ -98,7 +98,15 @@ public class PgenWriteTest {
             // larger still, includes ~6000 multiallelic sites (~117,932 variants/10 samples)
             { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26" },
             { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26" },
-       };
+
+            {  Paths.get("testdata/hg38_trio.pik3ca.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26" },
+            // same as hg38_trio.pik3ca.vcf above, but with the genotypes for the variant at 179135392 modified so the last site allele is not
+            // referenced by any genotype; this triggers the issue described https://groups.google.com/g/plink2-users/c/Sn5qVCyDlDw/m/GOWScY6tAQAJ
+            // currently this fails because we haven't picked up the new plink code with the fix (described here
+            // https://groups.google.com/g/plink2-users/c/Sn5qVCyDlDw/m/GOWScY6tAQAJ); this should be fixed the next time we update to new code
+            // and a newer version of plink2, and then this test can be enabled
+            //{ Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26" }
+        };
     }
 
     @Test(dataProvider = "roundTripThroughPlink2Tests")
@@ -107,29 +115,30 @@ public class PgenWriteTest {
         final PgenWriteMode pgenWriteMode,
         final String extraPlinkArgs) throws IOException, InterruptedException {
  
-        // first, convert the test VCF to pgen twice, once using the PgenWriter and once using plink2
+        // first, convert the test VCF to pgen twice; once using the PgenWriter and once using plink2 directly
         final TestUtils.PgenFileSet jniFileSet = TestUtils.vcfToPgen_jni(originalVCF, pgenWriteMode);
         final TestUtils.PgenFileSet plink2FileSet = TestUtils.vcfToPgen_plink2(originalVCF);
 
-        // now, use plink2 to reconvert both of the pgens back into VCFs
-        final Path vcfFromPGEN_jni = TestUtils.pgenToVCF_plink2(jniFileSet, "FromJNI", extraPlinkArgs);
-        final Path vcfFromPGEN_plink2 = TestUtils.pgenToVCF_plink2(plink2FileSet, "FromPlink2", extraPlinkArgs);
-
-        // use plink2 to validate both of the pgen file sets
+        // now use plink2 to validate both of the generated pgen file sets
         if (pgenWriteMode != PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX) {
             // while we're at it, run plink2 --pgen-diff on the outputs
-            // but only if write mode != kPgenWriteSeparateIndex, since that causes plink2 to say the pgen file is corrupted 
+            // but only if write mode != kPgenWriteSeparateIndex, since that causes plink2 to say the pgen file is corrupt 
             TestUtils.validatePgen_plink2(jniFileSet);
             TestUtils.validatePgen_plink2(plink2FileSet);
         }
 
-        // run a plink2 diff on the two filesets and make sure there are no issues reported
+        // run a plink2 diff on the two filesets and make sure there are no differences reported
         TestUtils.pgenDiff_plink2(jniFileSet, plink2FileSet);
 
-        // compare the two round-tripped vcfs to each other see if they're equivalent to each other (note that equivalence
-        // doesn't mean they're correct, only that the pgen we generated is concordant with plink2's), and then for extra measure,
-        // compare the pgen-jni round-tripped vcf with the ORIGINAL vcf
+        // now, use plink2 to reconvert both of the generated pgens back into VCFs, and then compare the two round-tripped VCFs to
+        // each other see if they're concordant (note that concordance doesn't mean they're correct, only that the VCF created from
+        // the pgen fileset that was created by the pgen writer is concordant with the VCF created from the pgen fileset created by
+        // plink2)
+        final Path vcfFromPGEN_jni = TestUtils.pgenToVCF_plink2(jniFileSet, "FromJNI", extraPlinkArgs);
+        final Path vcfFromPGEN_plink2 = TestUtils.pgenToVCF_plink2(plink2FileSet, "FromPlink2", extraPlinkArgs);
         TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, vcfFromPGEN_plink2);
+
+        // finally, for extra measure, compare the pgen-jni round-tripped VCF with the ORIGINAL VCF
         TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, originalVCF);
     }
 
@@ -230,7 +239,7 @@ public class PgenWriteTest {
         try (final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false);
              final PgenWriter writer = new PgenWriter(
                     new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
-                    // use our test sample, which has only a single sample (this will cause an artifically small allele_code buffer
+                    // use our test header, which has only a single sample (this will cause an artifically small allele_code buffer
                     // to be allocated, which will then be overflowed when using the variants from the 3-sample test file)
                     TestUtils.createSingleSampleVCFHeader(),
                     PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
