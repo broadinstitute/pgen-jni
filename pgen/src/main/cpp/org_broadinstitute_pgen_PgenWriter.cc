@@ -21,7 +21,7 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass object,
                                                  jlong numberOfVariants,
                                                  jint sampleCount) {
 
-    // the plink code makes a copy of filename, so this can be released before this function returns
+    // the plink code makes a copy of this filename, so this can be released before this function returns
     const char* const cFilename = env->GetStringUTFChars(filename, nullptr);
  
     jlong pgenHandle;
@@ -38,25 +38,25 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass object,
 }
 
 JNIEXPORT void JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv* env, jclass object,
+Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv *env, jclass object,
                                                       jlong pgenHandle,
                                                       jobject alleleBuffer){
     const int32_t* allele_codes = reinterpret_cast<int32_t*>(env->GetDirectBufferAddress(alleleBuffer));
     if ( !allele_codes ) {
-        throwJavaException(env, "Native code failure getting address for seqs ByteBuffer");
+        throwJavaException(env, "Native code failure getting address for allele codes in appendAlleles");
     } else {
         PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
         try {
             appendAlleles(pgenContext, allele_codes);
         } catch (PgenException& e) {
-            reThrowAsJavaException(env, e, "Native code failure appending alleles");
+            reThrowAsJavaException(env, e, "Native code failure in appendAlleles");
         }
     }
 }
 
 JNIEXPORT void JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_closePgen(JNIEnv * env, jclass object, jlong pgenHandle, jlong droppedVariantCount) {
-    PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
+Java_org_broadinstitute_pgen_PgenWriter_closePgen(JNIEnv *env, jclass object, jlong pgenHandle, jlong droppedVariantCount) {
+    PgenContext *pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
     try {
         closePgen(pgenContext, droppedVariantCount);
     } catch (PgenException& e) {
@@ -65,27 +65,27 @@ Java_org_broadinstitute_pgen_PgenWriter_closePgen(JNIEnv * env, jclass object, j
 }
 
 JNIEXPORT jlong JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_getPgenVariantCount(JNIEnv * env, jclass object, jlong pgenHandle) {
-    PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
+Java_org_broadinstitute_pgen_PgenWriter_getPgenVariantCount(JNIEnv *env, jclass object, jlong pgenHandle) {
+    PgenContext *pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
     const long varCount = getNumberOfVariantsWritten(pgenContext);
     return varCount;
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_createBuffer( JNIEnv* env, jclass cls, jint length ) {
-    void* buf = malloc(length);
+Java_org_broadinstitute_pgen_PgenWriter_createBuffer( JNIEnv *env, jclass cls, jint length ) {
+    void *buf = malloc(length);
     if ( !buf ) {
-        throwJavaException(env, "Native code failure allocating memory for  buffer");
+        throwJavaException(env, "Native code failure allocating memory for ByteBuffer");
         return 0;
     }
     return env->NewDirectByteBuffer(buf, length);
 }
 
 JNIEXPORT void JNICALL
-Java_org_broadinstitute_pgen_PgenWriter_destroyByteBuffer( JNIEnv* env, jclass cls, jobject byteBuf ) {
-    void* buf = env->GetDirectBufferAddress(byteBuf);
+Java_org_broadinstitute_pgen_PgenWriter_destroyByteBuffer( JNIEnv *env, jclass cls, jobject byteBuf ) {
+    void *buf = env->GetDirectBufferAddress(byteBuf);
     if ( !buf ) {
-        throwJavaException(env, "Native code failure getting ByteBuffer address");
+        throwJavaException(env, "Native code failure getting ByteBuffer address to free");
     }
     free(buf);
 }

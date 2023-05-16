@@ -15,8 +15,6 @@ namespace pgenlib {
     static const int kErrMessageBufSize = 1024;
 
     //TODO: should we use variant_ct_limit instead of requiring the variant count to be known up front ?
-    // Since we need to keep this code in sync with the plink2 pgenlib code, try to use variable names that match
-    // the python code to make it easier to track/propagate code changes when updating to newer plink2 commits.
     PgenContext *openPgen(
             const char* cFilename,
             const int pgenWriteModeInt,

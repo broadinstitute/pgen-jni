@@ -61,7 +61,7 @@ public class PgenWriter implements VariantContextWriter {
     // private long nonSNP_ct = 0;
     // private long mnp_ct = 0;
 
-    // native JNI methods
+    // ******************** Native JNI methods  ********************
     private static native long openPgen(String file, int pgenWriteModeInt, long numberOfVariants, int numberOfSamples);
     private static native void closePgen(long pgenContextHandle, long numDroppedVariants);
     /**
@@ -71,8 +71,9 @@ public class PgenWriter implements VariantContextWriter {
     private static native void appendAlleles(long pgenContextHandle, ByteBuffer alleles);
     private static native ByteBuffer createBuffer(int length);
     private static native void destroyByteBuffer(ByteBuffer buffer);
-
-     static {
+   // ******************** End Native JNI methods  ********************
+ 
+    static {
         System.loadLibrary("pgen");
     }
 
