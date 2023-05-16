@@ -19,14 +19,15 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass object,
                                                  jstring filename,
                                                  jint pgenWriteModeInt,
                                                  jlong numberOfVariants,
-                                                 jint sampleCount) {
+                                                 jint sampleCount,
+                                                 jint maxAltAlleles) {
 
     // the plink code makes a copy of this filename, so this can be released before this function returns
     const char* const cFilename = env->GetStringUTFChars(filename, nullptr);
  
     jlong pgenHandle;
     try {
-        PgenContext* const pgenContext = openPgen(cFilename, pgenWriteModeInt, numberOfVariants, sampleCount);
+        PgenContext* const pgenContext = openPgen(cFilename, pgenWriteModeInt, numberOfVariants, sampleCount, maxAltAlleles);
         env->ReleaseStringUTFChars (filename, cFilename);
         pgenHandle = reinterpret_cast<jlong>(pgenContext);
     } catch (PgenException& e) {

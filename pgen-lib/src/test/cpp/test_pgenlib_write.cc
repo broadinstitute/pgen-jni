@@ -115,7 +115,8 @@ BOOST_AUTO_TEST_CASE(test_close_with_no_writes) {
             tmpFileName,
             PGEN_FILE_MODE_WRITE_AND_COPY,
             10L,
-            3);
+            3,
+            plink2::kPglMaxAltAlleleCt);
     BOOST_REQUIRE_NE(pgenContext, nullptr);
     unlink(tmpFileName);
     BOOST_REQUIRE_EXCEPTION(
@@ -151,7 +152,7 @@ BOOST_AUTO_TEST_CASE(test_invalid_write_mode) {
     unlink(tmpFileName);
     const int invalidWriteMode = -2; // must be one of 0, 1, 2
     BOOST_REQUIRE_EXCEPTION(
-            pgenlib::openPgen(tmpFileName, invalidWriteMode, 10L, 3),
+            pgenlib::openPgen(tmpFileName, invalidWriteMode, 10L, 3, plink2::kPglMaxAltAlleleCt),
             PgenException,
             [expectedInvalidModeMessage](PgenException ex) -> bool  {
                 return strstr(ex.what(), expectedInvalidModeMessage);
@@ -166,7 +167,7 @@ BOOST_AUTO_TEST_CASE(test_invalid_sample_count) {
     unlink(tmpFileName);
     const int invalidSampleCount = 0; // must be >= 1
     BOOST_REQUIRE_EXCEPTION(
-            pgenlib::openPgen(tmpFileName, 1, 10L, invalidSampleCount),
+            pgenlib::openPgen(tmpFileName, 1, 10L, invalidSampleCount, plink2::kPglMaxAltAlleleCt),
             PgenException,
             [expectedInvalidSampleCountMessage](PgenException ex) -> bool  {
                 return strstr(ex.what(), expectedInvalidSampleCountMessage);
@@ -181,7 +182,7 @@ BOOST_AUTO_TEST_CASE(test_invalid_variant_count) {
     unlink(tmpFileName);
     const long invalidVariantCount = 0; // must be >= 1
     BOOST_REQUIRE_EXCEPTION(
-            pgenlib::openPgen(tmpFileName, 1, invalidVariantCount, 3),
+            pgenlib::openPgen(tmpFileName, 1, invalidVariantCount, 3, plink2::kPglMaxAltAlleleCt),
             PgenException,
             [expectedInvalidVariantCountMessage](PgenException ex) -> bool  {
                 return strstr(ex.what(), expectedInvalidVariantCountMessage);
@@ -236,7 +237,8 @@ long test_write_unphased_pgen(
             tmp_file_name,
             pgen_file_mode,
             n_variants,
-            n_samples);
+            n_samples,
+            plink2::kPglMaxAltAlleleCt);
     BOOST_REQUIRE_NE(pgen_context, nullptr);
 
     for (int i = 0; i < n_variants; i++) {

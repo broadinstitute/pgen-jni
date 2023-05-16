@@ -13,6 +13,7 @@ namespace pgenlib {
         //uintptr_t alloc_cacheline_ct;
         uint32_t sampleCount;
         uint32_t max_vrec_len;
+        uint32_t allele_ct_limit;
 
         uintptr_t* genovec;         // genotype vector
         uintptr_t* patch_01_set;

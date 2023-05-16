@@ -31,7 +31,7 @@ public class PgenWriter implements VariantContextWriter {
     private static Log logger = Log.getInstance(PgenWriter.class);
 
     public static final int PLINK2_NO_CALL_VALUE = -9;
-    public static final int PLINK2_MAX_ALTERNATE_ALLELES = 255;
+    public static final int PLINK2_MAX_ALTERNATE_ALLELES = 254;  // plink2::kPglMaxAltAlleleCt
 
     public static String PGEN_EXTENSION = ".pgen";
     public static String PGEN_INDEX_EXTENSION = ".pgen.pgi";    
@@ -62,7 +62,7 @@ public class PgenWriter implements VariantContextWriter {
     // private long mnp_ct = 0;
 
     // ******************** Native JNI methods  ********************
-    private static native long openPgen(String file, int pgenWriteModeInt, long numberOfVariants, int numberOfSamples);
+    private static native long openPgen(String file, int pgenWriteModeInt, long numberOfVariants, int numberOfSamples, int maxAltAlleles);
     private static native boolean closePgen(long pgenContextHandle, long numDroppedVariants);
     /**
      * @return the number of variants actually written to the pgen
@@ -101,7 +101,7 @@ public class PgenWriter implements VariantContextWriter {
         this.maxAltAlleles = maxAltAlleles;
         this.expectedVariantCount = numberOfVariants;
 
-        pgenContextHandle = openPgen(pgenFile.getRawInputString(), pgenWriteMode.value(), numberOfVariants, vcfHeader.getNGenotypeSamples());
+        pgenContextHandle = openPgen(pgenFile.getRawInputString(), pgenWriteMode.value(), numberOfVariants, vcfHeader.getNGenotypeSamples(), maxAltAlleles);
         if (pgenContextHandle == 0) {
             //openPgen wthrew an async Java exception
             return;
