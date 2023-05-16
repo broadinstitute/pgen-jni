@@ -102,7 +102,7 @@ public class PgenWriter implements VariantContextWriter {
         this.expectedVariantCount = numberOfVariants;
 
         pgenContextHandle = openPgen(pgenFile.getRawInputString(), pgenWriteMode.value(), numberOfVariants, vcfHeader.getNGenotypeSamples());
-        alleleBuffer = createBuffer(vcfHeader.getNGenotypeSamples()*2*4); //samples * ploidy * bytes in int32
+        alleleBuffer = createBuffer(vcfHeader.getNGenotypeSamples() * 2 * 4); //samples * ploidy * bytes in int32_t (sizeof AlleleCode)
         alleleBuffer.order(ByteOrder.LITTLE_ENDIAN);
 
         // create the .pvar, and write the entire psam

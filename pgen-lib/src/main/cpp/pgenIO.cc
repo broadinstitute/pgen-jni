@@ -14,7 +14,6 @@ namespace pgenlib {
     plink2::PgenWriteMode validatePgenWriteMode(const uint32_t anInt);
     static const int kErrMessageBufSize = 1024;
 
-    //TODO: should we use variant_ct_limit instead of requiring the variant count to be known up front ?
     PgenContext *openPgen(
             const char* cFilename,
             const int pgenWriteModeInt,
@@ -31,6 +30,10 @@ namespace pgenlib {
             char errMessageBuff[kErrMessageBufSize];
             snprintf(errMessageBuff, kErrMessageBufSize, "Invalid variant count: %ld. At least 1 variant is required.", variantCount);
             throw PgenException(errMessageBuff);
+        } else if (variantCount > UINT32_MAX) {
+            char errMessageBuff[kErrMessageBufSize];
+            snprintf(errMessageBuff, kErrMessageBufSize, "Invalid variant count: %ld exceeds maximum allowable variant count.", variantCount);
+            throw PgenException(errMessageBuff);
         }
 
         PgenContext* pGenContext = static_cast<PgenContext *const>(malloc(sizeof(PgenContext)));
@@ -42,11 +45,13 @@ namespace pgenlib {
             free(pGenContext);
             throw PgenException("Native code failure allocating STPgenWriter");
         }
-        //TODO: fix this type
-        pGenContext->sampleCount = static_cast<uint32_t>(sampleCount);
 
-        //TODO: fix these types, plink2::DivUp(uintptr_t val, uint32_t divisor) which are long on Mac
-        uint32_t bitvec_cacheline_ct = plink2::DivUp(sampleCount, plink2::kBitsPerCacheline);
+        // convert sampleCount and variantCount to the types plink wants
+        pGenContext->sampleCount = static_cast<uint32_t>(sampleCount);
+        uint32_t variant_ct = static_cast<uint32_t>(variantCount);
+
+        //plink2::DivUp(uintptr_t val, uint32_t divisor)
+        uint32_t bitvec_cacheline_ct = plink2::DivUp(pGenContext->sampleCount, plink2::kBitsPerCacheline);
 
         //    if nonref_flags is not None:
         //      if type(nonref_flags) == type(True):
@@ -59,9 +64,8 @@ namespace pgenlib {
         //          if cachealigned_malloc(bitvec_cacheline_ct * kCacheline, &(self._nonref_flags)):
         //              raise MemoryError()
 
-        //**********
-        // TODO: wtf does this do ??
-        //          bytes_to_bits_internal(nonref_flags, sample_ct, self._nonref_flags)
+        // this code is not using nonref_flags
+        // bytes_to_bits_internal(nonref_flags, sample_ct, self._nonref_flags)
 
         //    cdef const char* fname = <const char*>filename
         //    cdef PgenGlobalFlags phase_dosage_gflags = kfPgenGlobal0
@@ -96,11 +100,11 @@ namespace pgenlib {
             const plink2::PglErr init1Result = plink2::SpgwInitPhase1(cFilename, //filename
                                                                   nullptr,  // allele index offsets ( for multi allele)
                                                                   nullptr,  // non-ref flags
-                                                                  static_cast<uint32_t>(variantCount), // number of variants
+                                                                  variant_ct, // number of variants
                                                                   pGenContext->sampleCount, // sample count
                                                                   0, // optional max allele count
                                                                   pgenWriteMode,
-                                                                  plink2::kfPgenGlobal0, //todo- is this right ? type: PgenGlobalFlags phase dosage gflags (genotype?)
+                                                                  plink2::kfPgenGlobal0,
                                                                   1, //  non-ref flags storage
                                                                   pGenContext->spgwp, // STPgenWriter * spgwp
                                                                   &alloc_cacheline_ct, //  uintptr_t* alloc_cacheline_ct

@@ -41,14 +41,14 @@ JNIEXPORT void JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv *env, jclass object,
                                                       jlong pgenHandle,
                                                       jobject alleleBuffer){
-    const int32_t* allele_codes = reinterpret_cast<int32_t*>(env->GetDirectBufferAddress(alleleBuffer));
+    const int32_t *allele_codes = reinterpret_cast<int32_t*>(env->GetDirectBufferAddress(alleleBuffer));
     if ( !allele_codes ) {
         throwJavaException(env, "Native code failure getting address for allele codes in appendAlleles");
     } else {
-        PgenContext* pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
+        PgenContext *pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
         try {
             appendAlleles(pgenContext, allele_codes);
-        } catch (PgenException& e) {
+        } catch (PgenException &e) {
             reThrowAsJavaException(env, e, "Native code failure in appendAlleles");
         }
     }
@@ -59,7 +59,7 @@ Java_org_broadinstitute_pgen_PgenWriter_closePgen(JNIEnv *env, jclass object, jl
     PgenContext *pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
     try {
         closePgen(pgenContext, droppedVariantCount);
-    } catch (PgenException& e) {
+    } catch (PgenException &e) {
         reThrowAsJavaException(env, e, "Native code failure closing pgen context");
     }
 }

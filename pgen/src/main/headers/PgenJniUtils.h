@@ -12,6 +12,7 @@ static int ERROR_MESSAGE_BUFFER_SIZE = 1024;
 
 // Throw a Java exception (PgenJniException) with the given error message. Note that control RETURNS
 // to the caller after the exception is thrown.
+//
 static bool throwJavaException( JNIEnv* env, const char* message ) {
     jclass exceptionClass = env->FindClass("org/broadinstitute/pgen/PgenJniException");
     bool result = false;
