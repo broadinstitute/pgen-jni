@@ -37,7 +37,7 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass object,
     return pgenHandle;
 }
 
-JNIEXPORT void JNICALL
+JNIEXPORT jboolean JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv *env, jclass object,
                                                       jlong pgenHandle,
                                                       jobject alleleBuffer){
@@ -48,19 +48,23 @@ Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv *env, jclass object
         PgenContext *pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
         try {
             appendAlleles(pgenContext, allele_codes);
+            return true;
         } catch (PgenException &e) {
             reThrowAsJavaException(env, e, "Native code failure in appendAlleles");
+            return false;
         }
     }
 }
 
-JNIEXPORT void JNICALL
+JNIEXPORT jboolean JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_closePgen(JNIEnv *env, jclass object, jlong pgenHandle, jlong droppedVariantCount) {
     PgenContext *pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
     try {
         closePgen(pgenContext, droppedVariantCount);
+        return true;
     } catch (PgenException &e) {
         reThrowAsJavaException(env, e, "Native code failure closing pgen context");
+        return false;
     }
 }
 
@@ -76,16 +80,18 @@ Java_org_broadinstitute_pgen_PgenWriter_createBuffer( JNIEnv *env, jclass cls, j
     void *buf = malloc(length);
     if ( !buf ) {
         throwJavaException(env, "Native code failure allocating memory for ByteBuffer");
-        return 0;
+        return nullptr;
     }
     return env->NewDirectByteBuffer(buf, length);
 }
 
-JNIEXPORT void JNICALL
+JNIEXPORT jboolean JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_destroyByteBuffer( JNIEnv *env, jclass cls, jobject byteBuf ) {
     void *buf = env->GetDirectBufferAddress(byteBuf);
     if ( !buf ) {
         throwJavaException(env, "Native code failure getting ByteBuffer address to free");
+        return false;
     }
     free(buf);
+    return true;
 }

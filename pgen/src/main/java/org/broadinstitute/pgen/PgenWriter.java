@@ -49,8 +49,8 @@ public class PgenWriter implements VariantContextWriter {
         public int value() { return this.mode; }
     };
 
-    private final HtsPath pVarFile;
-    private final HtsPath pSamFile;
+    private HtsPath pVarFile = null;
+    private HtsPath pSamFile = null;
     private final int maxAltAlleles;
     private long pgenContextHandle;
     private ByteBuffer alleleBuffer;
@@ -63,14 +63,14 @@ public class PgenWriter implements VariantContextWriter {
 
     // ******************** Native JNI methods  ********************
     private static native long openPgen(String file, int pgenWriteModeInt, long numberOfVariants, int numberOfSamples);
-    private static native void closePgen(long pgenContextHandle, long numDroppedVariants);
+    private static native boolean closePgen(long pgenContextHandle, long numDroppedVariants);
     /**
      * @return the number of variants actually written to the pgen
      */
     private static native long getPgenVariantCount(long pgenContextHandle);
-    private static native void appendAlleles(long pgenContextHandle, ByteBuffer alleles);
+    private static native boolean appendAlleles(long pgenContextHandle, ByteBuffer alleles);
     private static native ByteBuffer createBuffer(int length);
-    private static native void destroyByteBuffer(ByteBuffer buffer);
+    private static native boolean destroyByteBuffer(ByteBuffer buffer);
    // ******************** End Native JNI methods  ********************
  
     static {
@@ -102,9 +102,17 @@ public class PgenWriter implements VariantContextWriter {
         this.expectedVariantCount = numberOfVariants;
 
         pgenContextHandle = openPgen(pgenFile.getRawInputString(), pgenWriteMode.value(), numberOfVariants, vcfHeader.getNGenotypeSamples());
+        if (pgenContextHandle == 0) {
+            //openPgen wthrew an async Java exception
+            return;
+        }
         alleleBuffer = createBuffer(vcfHeader.getNGenotypeSamples() * 2 * 4); //samples * ploidy * bytes in int32_t (sizeof AlleleCode)
+        if (alleleBuffer == null) {
+            //createBuffer threw an async Java exception
+            return;
+        }
         alleleBuffer.order(ByteOrder.LITTLE_ENDIAN);
-
+ 
         // create the .pvar, and write the entire psam
         pVarFile = createPVAR(pgenFile, vcfHeader);
         pSamFile = writePSAM(pgenFile, vcfHeader);
@@ -132,7 +140,6 @@ public class PgenWriter implements VariantContextWriter {
         // writer is opened)
         closePgen(pgenContextHandle, droppedVariantCount);
         pgenContextHandle = 0;
-
         destroyByteBuffer(alleleBuffer);
         alleleBuffer = null;
     }
@@ -191,10 +198,11 @@ public class PgenWriter implements VariantContextWriter {
                     "Position: " + alleleBuffer.position() + " Expected " + alleleBuffer.limit());
         }
         alleleBuffer.rewind();
-        appendAlleles(pgenContextHandle, alleleBuffer);
-
-        // add the VC to pvar
-        pVarWriter.add(vc);
+        final boolean appendRet = appendAlleles(pgenContextHandle, alleleBuffer);
+        if (appendRet) {
+            // only add to the pvar if appendAlleles succeeded
+            pVarWriter.add(vc);
+        }
     }
 
    /**
