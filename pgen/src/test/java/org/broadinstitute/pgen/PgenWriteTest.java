@@ -64,8 +64,8 @@ public class PgenWriteTest {
         Assert.assertNotEquals(pgenSize, 0L);
     }
 
-    @DataProvider(name="roundTripThroughPlink2Tests")
-    public Object[][] roundTripThroughPlink2Provider() {
+    @DataProvider(name="roundTripCompareWithPlink2Provider")
+    public Object[][] roundTripCompareWithPlink2Provider() {
         return new Object[][] {
             // This test creates a PGEN from a VCF, and then validates the generated PGEN by:
             //
@@ -109,7 +109,7 @@ public class PgenWriteTest {
         };
     }
 
-    @Test(dataProvider = "roundTripThroughPlink2Tests")
+    @Test(dataProvider = "roundTripCompareWithPlink2Provider")
     public void testRoundTripCompareWithPlink2(
         final Path originalVCF,
         final PgenWriteMode pgenWriteMode,

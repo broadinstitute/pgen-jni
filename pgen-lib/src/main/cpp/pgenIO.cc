@@ -25,23 +25,32 @@ namespace pgenlib {
         plink2::PgenWriteMode pgenWriteMode = validatePgenWriteMode(pgenWriteModeInt);
         if (sampleCount < 1) {
             char errMessageBuff[kErrMessageBufSize];
-            snprintf(errMessageBuff, kErrMessageBufSize, "Invalid sample count: %d. At least 1 sample is required.", sampleCount);
+            snprintf(errMessageBuff, kErrMessageBufSize, "Invalid sample count: %d. At least 1 sample is required.",
+                     sampleCount);
             throw PgenException(errMessageBuff);
         } else if (variantCount < 1) {
             char errMessageBuff[kErrMessageBufSize];
-            snprintf(errMessageBuff, kErrMessageBufSize, "Invalid variant count: %ld. At least 1 variant is required.", variantCount);
+            snprintf(errMessageBuff, kErrMessageBufSize, "Invalid variant count: %ld. Variant count must be > 0.",
+                     variantCount);
             throw PgenException(errMessageBuff);
-        } else if (variantCount > UINT32_MAX) {
+        } else if (variantCount > plink2::kPglMaxVariantCt) {
             char errMessageBuff[kErrMessageBufSize];
-            snprintf(errMessageBuff, kErrMessageBufSize, "Invalid variant count: %ld exceeds maximum allowable variant count.", variantCount);
+            snprintf(errMessageBuff, kErrMessageBufSize, "Invalid variant count: %ld exceeds maximum allowable variant count: %d.",
+                     variantCount,
+                     plink2::kPglMaxVariantCt);
             throw PgenException(errMessageBuff);
         } else if (maxAltAlleles < 2) {
             char errMessageBuff[kErrMessageBufSize];
-            snprintf(errMessageBuff, kErrMessageBufSize, "Invalid max alt allele count: %d must be alt least 2.", maxAltAlleles);
+            snprintf(errMessageBuff, kErrMessageBufSize, "Invalid max alt allele count: %d must be at least 2.",
+                     maxAltAlleles);
             throw PgenException(errMessageBuff);
         } else if (maxAltAlleles > plink2::kPglMaxAltAlleleCt) {
             char errMessageBuff[kErrMessageBufSize];
-            snprintf(errMessageBuff, kErrMessageBufSize, "Invalid max alt allele count: %d exceeds maximum alt allele count.", maxAltAlleles);
+            snprintf(errMessageBuff,
+                     kErrMessageBufSize,
+                     "Invalid max alt allele count: %d exceeds maximum allowable alt allele count: %d.",
+                     maxAltAlleles,
+                     plink2::kPglMaxAltAlleleCt);
             throw PgenException(errMessageBuff);
         }
 
@@ -55,18 +64,17 @@ namespace pgenlib {
             throw PgenException("Native code failure allocating STPgenWriter");
         }
 
-        // convert sampleCount and variantCount to the types plink wants
+        // convert sampleCount and variantCount to the types plink uses
         pGenContext->sampleCount = static_cast<uint32_t>(sampleCount);
         uint32_t variant_ct = static_cast<uint32_t>(variantCount);
         // total max allele count is max alt count + 1
         pGenContext->allele_ct_limit = static_cast<uint32_t>(maxAltAlleles + 1);
 
+        //TODO: what is non_ref_strage_flags values 1, 2, 3 ?
+
         //plink2::DivUp(uintptr_t val, uint32_t divisor)
         uint32_t bitvec_cacheline_ct = plink2::DivUp(pGenContext->sampleCount, plink2::kBitsPerCacheline);
-
         uintptr_t alloc_cacheline_ct = 0;
-        uint32_t max_vrec_len;
-
         const plink2::PglErr init1Result = plink2::SpgwInitPhase1(cFilename, //filename
                                                                 nullptr,  // allele index offsets ( for multi allele)
                                                                 nullptr,  // non-ref flags
@@ -78,7 +86,7 @@ namespace pgenlib {
                                                                 1, //  non-ref flags storage
                                                                 pGenContext->spgwp, // STPgenWriter * spgwp
                                                                 &alloc_cacheline_ct, //  uintptr_t* alloc_cacheline_ct
-                                                                &max_vrec_len);  // max vrec len ptr
+                                                                &pGenContext->max_vrec_len);
         throwOnPglErr(init1Result, "plink2 initialization (SpgwInitPhase1 failed)");
 
         uint32_t genovec_cacheline_ct = plink2::DivUp(pGenContext->sampleCount, plink2::kNypsPerCacheline);
@@ -86,20 +94,20 @@ namespace pgenlib {
         uint32_t patch_10_vals_cacheline_ct = plink2::DivUp(pGenContext->sampleCount * 2 * sizeof(plink2::AlleleCode), plink2::kCacheline);
         uint32_t dosage_main_cacheline_ct = plink2::DivUp(pGenContext->sampleCount, (2 * plink2::kInt32PerCacheline));
 
-        // There are two copies of pgenlib.pyx in the plink2 build (that have many differences. One uses + 3, one uses + 5.
-        // Prefer the one in src, and go with + 5.
-        unsigned char* spgw_alloc;
+        // There are two copies of pgenlib.pyx in the plink2 build, that have many differences. One uses + 3 for
+        // this calculation, and one uses + 5. Prefer the one in src, and go with + 5.
+        // keep the pointer to the arena block in pGenContext so we can free it at the end
         if (plink2::cachealigned_malloc(
                 (alloc_cacheline_ct + genovec_cacheline_ct + 5 * bitvec_cacheline_ct + patch_01_vals_cacheline_ct + patch_10_vals_cacheline_ct + dosage_main_cacheline_ct) *
-                plink2::kCacheline, &spgw_alloc)) {
-            throw PgenException("Native code failure allocating cachealigned_malloc");
+                plink2::kCacheline, &pGenContext->spgw_alloc)) {
+            throw PgenException("Native code failure (cachealigned_malloc) allocating spgw_alloc");
         }
-        SpgwInitPhase2(max_vrec_len, pGenContext->spgwp, spgw_alloc);
+        SpgwInitPhase2(pGenContext->max_vrec_len, pGenContext->spgwp, pGenContext->spgw_alloc);
 
-        unsigned char* spgw_alloc_iter = &(spgw_alloc[alloc_cacheline_ct * plink2::kCacheline]);
+        unsigned char* spgw_alloc_iter = &(pGenContext->spgw_alloc[alloc_cacheline_ct * plink2::kCacheline]);
+
         pGenContext->genovec = (uintptr_t *) spgw_alloc_iter;
         spgw_alloc_iter = &(spgw_alloc_iter[genovec_cacheline_ct * plink2::kCacheline]);
-
         pGenContext->patch_01_set = (uintptr_t*) spgw_alloc_iter;
         spgw_alloc_iter = &(spgw_alloc_iter[bitvec_cacheline_ct * plink2::kCacheline]);
         pGenContext->patch_01_vals = (plink2::AlleleCode*) spgw_alloc_iter;
@@ -107,10 +115,16 @@ namespace pgenlib {
         pGenContext->patch_10_set = (uintptr_t*) spgw_alloc_iter;
         spgw_alloc_iter = &(spgw_alloc_iter[bitvec_cacheline_ct * plink2::kCacheline]);
         pGenContext->patch_10_vals = (plink2::AlleleCode*) spgw_alloc_iter;
+
+        // we're not using the phase info...yet
         spgw_alloc_iter = &(spgw_alloc_iter[patch_10_vals_cacheline_ct * plink2::kCacheline]);
         pGenContext->phasepresent = (uintptr_t *) spgw_alloc_iter;
         spgw_alloc_iter = &(spgw_alloc_iter[bitvec_cacheline_ct * plink2::kCacheline]);
         pGenContext->phaseinfo = (uintptr_t*) spgw_alloc_iter;
+
+        // we probably don't need these dosage blocks, but per this comment from the python
+        // code it probably doesnt much matter:
+        // # Could skimp on dosage/phase, but that doesn't gain us much.
         spgw_alloc_iter = &(spgw_alloc_iter[bitvec_cacheline_ct * plink2::kCacheline]);
         pGenContext->dosage_present = (uintptr_t*) spgw_alloc_iter;
         spgw_alloc_iter = &(spgw_alloc_iter[bitvec_cacheline_ct * plink2::kCacheline]);
@@ -119,8 +133,8 @@ namespace pgenlib {
         //    # bugfix (16 Apr 2023): SpgwAppendBiallelicGenovec[Hphase] assumes
         //    # trailing bits are clear
         //    self._genovec[(sample_ct - 1) // kBitsPerWordD2] = 0
-        pGenContext->genovec[(pGenContext->sampleCount - 1) / plink2::kBitsPerWordD2] = 0; // rely on floor division
-        pGenContext->phasepresent[(pGenContext->sampleCount - 1) / plink2::kBitsPerWord] = 0;
+        pGenContext->genovec[(pGenContext->sampleCount - 1) / plink2::kBitsPerWordD2] = 0; // floor division
+        pGenContext->phasepresent[(pGenContext->sampleCount - 1) / plink2::kBitsPerWord] = 0; // floor division
 
         return pGenContext;
     }
@@ -222,6 +236,9 @@ namespace pgenlib {
         if (bErr) {
             throwOnPglErr(cleanupErr, "Error cleaning up on pgen close: CleanupSpgw");
         }
+        free(pGenContext->spgwp);
+        plink2::aligned_free(pGenContext->spgw_alloc);
+        free(reinterpret_cast<void*>(const_cast<PgenContext *>(pGenContext)));
     }
 
     long getNumberOfVariantsWritten(const PgenContext *const pGenContext) {

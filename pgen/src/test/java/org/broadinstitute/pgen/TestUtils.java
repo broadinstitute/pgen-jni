@@ -215,7 +215,7 @@ public class TestUtils {
         return retCode;
     }
 
-    // compare a plink2-generated VCF with a pgen-jni-generated VCF
+    // compare a plink2-generated VCF with a pgen-jni-generated VCF - note that this does not compare the VCFHeaders
     public static void verifyRoundTripGenotypeConcordance(final Path actualVCF, final Path expectedVCF) {
         try (final VCFFileReader jniReader = new VCFFileReader(expectedVCF, false);
              final CloseableIterator<VariantContext> jniIt = jniReader.iterator()) {

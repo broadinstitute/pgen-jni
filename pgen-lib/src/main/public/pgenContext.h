@@ -10,9 +10,10 @@ namespace pgenlib {
 
     typedef struct PgenContext {
         plink2::STPgenWriter* spgwp;
-        //uintptr_t alloc_cacheline_ct;
-        uint32_t sampleCount;
-        uint32_t max_vrec_len;
+        // keep track of the arena memory so we can free it at the end
+        unsigned char* spgw_alloc;
+        // cdef uintptr_t* _nonref_flags
+        // cdef PgenGlobalFlags _phase_dosage_gflags
         uint32_t allele_ct_limit;
 
         uintptr_t* genovec;         // genotype vector
@@ -25,20 +26,8 @@ namespace pgenlib {
         uintptr_t* dosage_present;
         uint16_t* dosage_main;
 
-        //    cdef uintptr_t* _nonref_flags
-        //    cdef PgenGlobalFlags _phase_dosage_gflags
-        //    cdef uint32_t _allele_ct_limit
-
-        //    # preallocate buffers we'll use repeatedly
-        //    cdef uintptr_t* _genovec
-        //    cdef uintptr_t* _patch_01_set
-        //    cdef AlleleCode* _patch_01_vals
-        //    cdef uintptr_t* _patch_10_set
-        //    cdef AlleleCode* _patch_10_vals
-        //    cdef uintptr_t* _phasepresent
-        //    cdef uintptr_t* _phaseinfo
-        //    cdef uintptr_t* _dosage_present
-        //    cdef uint16_t* _dosage_main
+        uint32_t sampleCount;
+        uint32_t max_vrec_len;
 
     } PgenContext;
     
