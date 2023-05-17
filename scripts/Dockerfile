@@ -30,8 +30,8 @@ RUN cd ${HOME} && \
 
 # install plink2 executeable (required to run tests)
 # use wget -q to supress wget from emitting aws keys into public logs
-RUN wget -q https://s3.amazonaws.com/plink2-assets/plink2_linux_avx2_20230411.zip -P scripts && \
-    unzip scripts/plink2_linux_avx2_20230411.zip -d scripts && \
+RUN wget -q https://s3.amazonaws.com/plink2-assets/alpha4/plink2_linux_avx2_20230426.zip -P scripts && \
+    unzip scripts/plink2_linux_avx2_20230426.zip -d scripts && \
     mv scripts/plink2 /usr/local/bin
 
 # For some reason, the presence of this boost file seems to cause the build of the linux test component (gradle
