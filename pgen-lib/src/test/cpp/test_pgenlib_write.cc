@@ -19,6 +19,7 @@ template<size_t N> void createTempFile(const char* const nameTemplate, char (&ou
 void generate_allele_code_distribution(int32_t* const allele_codes, const int n_samples, const int n_alleles);
 long test_write_unphased_pgen(
         const int32_t* const allele_codes,
+        const int32_t allele_ct,
         const int pgen_file_mode,
         const long n_variants,
         const int n_samples,
@@ -68,10 +69,32 @@ BOOST_DATA_TEST_CASE(test_write_unphased_biallelic_small, s_pgenFileMode) {
     long variantCount = 0L;
     // don't be fooled by the reference to the variable "sample" below; its a variable name introduced by
     // the boost macro to refer to the parameter for the test case, which in this test is the pgen file mode...
-    const long file_size = test_write_unphased_pgen(allele_codes, sample, n_variants, n_samples, variantCount);
+    const long file_size = test_write_unphased_pgen(allele_codes, 2,sample, n_variants, n_samples, variantCount);
     // only check for non-zero file size, since the file size varies with the file mode
     BOOST_REQUIRE_NE(file_size, 0);
     BOOST_REQUIRE_EQUAL(variantCount, n_variants);
+}
+
+BOOST_AUTO_TEST_CASE(test_biallelic_one_allele_not_observed) {
+    constexpr long n_variants = 6;
+    constexpr int n_samples = 3;
+    constexpr int n_alleles = 2;
+    // one variants's worth of allele codes - drawn from 2 alleles over 3 samples, but with only one
+    // allele actually observed
+    constexpr int32_t allele_codes[] {0, 0, 0, 0, 0, 0 };
+    long variantCount = 0L;
+    test_write_unphased_pgen(allele_codes, n_alleles, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount);
+}
+
+BOOST_AUTO_TEST_CASE(test_multiallelic_some_alleles_not_observed) {
+    constexpr long n_variants = 6;
+    constexpr int n_samples = 3;
+    constexpr int n_alleles = 7;
+    // one variants's worth of allele codes - drawn from 7 alleles over 3 samples, but with only 3
+    // alleles actually observed
+    constexpr int32_t allele_codes[] {0, 1, 0, 5, 0, 4 };
+    long variantCount = 0L;
+    test_write_unphased_pgen(allele_codes, n_alleles, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount);
 }
 
 // write a larger, bi-allelic pgen, using only file mode PGEN_FILE_MODE_WRITE_AND_COPY
@@ -83,7 +106,7 @@ BOOST_AUTO_TEST_CASE(test_write_unphased_biallelic_large) {
     int32_t *allele_codes = new int32_t[n_samples * 2];
     generate_allele_code_distribution(allele_codes, n_samples, n_alleles);
     long variantCount = 0L;
-    const long file_size = test_write_unphased_pgen(allele_codes, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount);
+    const long file_size = test_write_unphased_pgen(allele_codes, n_alleles,PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount);
     delete[] allele_codes;
 
     BOOST_REQUIRE_EQUAL(file_size, 125450028); // cause thats what it is
@@ -99,7 +122,7 @@ BOOST_AUTO_TEST_CASE(test_write_unphased_multi_allelic_large) {
     int32_t *allele_codes = new int32_t[n_samples * 2];
     generate_allele_code_distribution(allele_codes, n_samples, n_alleles);
     long variantCount = 0L;
-    const long file_size = test_write_unphased_pgen(allele_codes, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount);
+    const long file_size = test_write_unphased_pgen(allele_codes, n_alleles,PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount);
     delete[] allele_codes;
 
     BOOST_REQUIRE_EQUAL(file_size, 911252530); // cause thats what it is
@@ -136,7 +159,7 @@ BOOST_AUTO_TEST_CASE(test_invalid_allele_code) {
     const char* const expectedMessageFragment = "Attempt to append invalid allele code";
     long variantCount;
     BOOST_REQUIRE_EXCEPTION(
-            test_write_unphased_pgen(allele_codes, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount),
+            test_write_unphased_pgen(allele_codes, 2, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount),
             PgenException,
             [expectedMessageFragment](PgenException ex) -> bool {
                 return strstr(ex.what(), expectedMessageFragment);
@@ -226,6 +249,7 @@ void createTempFile(const char* const nameTemplate, char (&outputFileName)[N]) {
 // given # of variants, # of samples, and write mode
 long test_write_unphased_pgen(
         const int32_t *allele_codes,
+        const int32_t allele_ct,
         const int pgen_file_mode,
         const long n_variants,
         const int n_samples,
@@ -242,7 +266,7 @@ long test_write_unphased_pgen(
     BOOST_REQUIRE_NE(pgen_context, nullptr);
 
     for (int i = 0; i < n_variants; i++) {
-        pgenlib::appendAlleles(pgen_context, allele_codes);
+        pgenlib::appendAlleles(pgen_context, allele_codes, allele_ct);
     }
     variantCount = getNumberOfVariantsWritten(pgen_context);
     closePgen(pgen_context, 0);

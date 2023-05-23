@@ -24,8 +24,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.EnumSet;
 import java.util.HashMap;
+//import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+//import java.util.Set;
 
 public class PgenWriter implements VariantContextWriter {
     private static Log logger = Log.getInstance(PgenWriter.class);
@@ -68,7 +70,7 @@ public class PgenWriter implements VariantContextWriter {
      * @return the number of variants actually written to the pgen
      */
     private static native long getPgenVariantCount(long pgenContextHandle);
-    private static native boolean appendAlleles(long pgenContextHandle, ByteBuffer alleles);
+    private static native boolean appendAlleles(long pgenContextHandle, ByteBuffer alleles, int alleleCount);
     private static native ByteBuffer createBuffer(int length);
     private static native boolean destroyByteBuffer(ByteBuffer buffer);
    // ******************** End Native JNI methods  ********************
@@ -170,14 +172,19 @@ public class PgenWriter implements VariantContextWriter {
         alleleBuffer.clear();
         final Map<Allele, Integer> alleleMap = buildAlleleMap(vc);
 
+//        final Set<Integer> observedAlleles = new HashSet<>();
         for (final Genotype g : vc.getGenotypes()) {
             if (g.getPloidy() != 2) {
                 throw new PgenJniException(
                     "PGEN only supports diploid samples and we see one with ploidy = " + g.getPloidy()
                         + " at line " + vc.toStringWithoutGenotypes());
             }
-            for (final Allele allele : g.getAlleles()) {
+           for (final Allele allele : g.getAlleles()) {
                 final Integer mapping = alleleMap.get(allele);
+                // if (mapping != -9) {
+                //     // don't count missing dat as an observed allele
+                //     observedAlleles.add(mapping);
+                // }
                 try {
                     alleleBuffer.putInt(mapping);
                 } catch (final BufferOverflowException e) {
@@ -198,7 +205,16 @@ public class PgenWriter implements VariantContextWriter {
                     "Position: " + alleleBuffer.position() + " Expected " + alleleBuffer.limit());
         }
         alleleBuffer.rewind();
-        final boolean appendRet = appendAlleles(pgenContextHandle, alleleBuffer);
+        // -1 to account for the synthetic -9 value that is always in in the alleleMap
+        int alleleMapSize_actual = alleleMap.size() - 1;
+        // if (observedAlleles.size() != alleleMapSize_actual) {
+        //     System.out.println(String.format(
+        //         "Alleles not observed (%d/%d) pos: %d",
+        //          observedAlleles.size(),
+        //         alleleMapSize_actual,
+        //          vc.getStart()));
+        // }
+        final boolean appendRet = appendAlleles(pgenContextHandle, alleleBuffer, alleleMap.size() - 1);
         if (appendRet) {
             // only add to the pvar if appendAlleles succeeded
             pVarWriter.add(vc);

@@ -105,7 +105,7 @@ public class PgenWriteTest {
             // currently this fails because we haven't picked up the new plink code with the fix (described here
             // https://groups.google.com/g/plink2-users/c/Sn5qVCyDlDw/m/GOWScY6tAQAJ); this should be fixed the next time we update to new code
             // and a newer version of plink2, and then this test can be enabled
-            //{ Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26" }
+            { Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26" }
         };
     }
 
