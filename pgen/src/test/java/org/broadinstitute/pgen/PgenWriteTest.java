@@ -159,6 +159,36 @@ public class PgenWriteTest {
          }
     }
 
+    @DataProvider(name="plink2CapabilitiesProvider")
+    public Object[][] plink2CapabilitiesProvider() {
+        return new Object[][] {
+            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26", true },
+            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26", true },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr M", false },
+        };
+    }
+
+    // disabled, since this is not really a pgen-jni test, just a convenient way to see how plink2 handles conversions
+    @Test(dataProvider = "plink2CapabilitiesProvider")
+    public void testPlink2Capabilities(
+        final Path originalVCF,
+        final PgenWriteMode pgenWriteMode,
+        final String additionalPlinkArgs,
+        final boolean ignorePhasing) throws IOException, InterruptedException {
+        // convert the test VCF to pgen, then back to vcf using plink2
+        final TestUtils.PgenFileSet plink2FileSet = TestUtils.vcfToPgen_plink2(originalVCF);
+        final Path vcfFromPGEN_plink2 = TestUtils.pgenToVCF_plink2(plink2FileSet, "FromPlink2", additionalPlinkArgs);
+
+        if (pgenWriteMode != PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX) {
+            // while we're at it, run plink2 --pgen-diff on the output
+            // but only if write mode != kPgenWriteSeparateIndex, since that causes plink2 to say the pgen file is corrupted 
+            TestUtils.validatePgen_plink2(plink2FileSet);
+        }
+
+        // compare the round tripped vcf with the original to see if they're concordant
+        TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_plink2, originalVCF, ignorePhasing);
+    }
+
     // reject non-diploid variants
     @Test(expectedExceptions = PgenJniException.class)
     public void testRejectNonDiploid() throws IOException {
