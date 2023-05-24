@@ -172,7 +172,9 @@ public class PgenWriter implements VariantContextWriter {
         alleleBuffer.clear();
         final Map<Allele, Integer> alleleMap = buildAlleleMap(vc);
 
-//        final Set<Integer> observedAlleles = new HashSet<>();
+        //System.out.print(String.format("Variant at %d", vc.getStart()));
+        //final Set<Integer> observedAlleles = new HashSet<>();
+     
         for (final Genotype g : vc.getGenotypes()) {
             if (g.getPloidy() != 2) {
                 throw new PgenJniException(
@@ -206,7 +208,7 @@ public class PgenWriter implements VariantContextWriter {
         }
         alleleBuffer.rewind();
         // -1 to account for the synthetic -9 value that is always in in the alleleMap
-        int alleleMapSize_actual = alleleMap.size() - 1;
+        //int alleleMapSize_actual = alleleMap.size() - 1;
         // if (observedAlleles.size() != alleleMapSize_actual) {
         //     System.out.println(String.format(
         //         "Alleles not observed (%d/%d) pos: %d",
@@ -215,6 +217,10 @@ public class PgenWriter implements VariantContextWriter {
         //          vc.getStart()));
         // }
         final boolean appendRet = appendAlleles(pgenContextHandle, alleleBuffer, alleleMap.size() - 1);
+        
+        // System.out.println();
+        // System.out.flush();
+
         if (appendRet) {
             // only add to the pvar if appendAlleles succeeded
             pVarWriter.add(vc);

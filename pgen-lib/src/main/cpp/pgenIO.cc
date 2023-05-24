@@ -196,11 +196,20 @@ namespace pgenlib {
         }
         write_allele_ct = unsigned_allele_ct;
 
+        //cout << " writing allele_ct " << allele_ct << " obs ct " << observed_allele_ct << "\n";
+        //cout.flush();
+        
         plink2::PglErr pglErr;
         if (!allPhased) {
             if ((patch_01_ct == 0) and (patch_10_ct == 0)) {
+                // if (allele_ct != 2) {
+                //     cout << "Writing multi-allelic " << allele_ct << " as bi-allelic";
+                // }
                 pglErr = SpgwAppendBiallelicGenovec(pGenContext->genovec, pGenContext->spgwp);
             } else {
+                // if (allele_ct == 2) {
+                //     cout << "Writing bi-allelic " << allele_ct << " as multi-allelic";
+                // }
                 pglErr = SpgwAppendMultiallelicSparse(
                         pGenContext->genovec,
                         pGenContext->patch_01_set,
