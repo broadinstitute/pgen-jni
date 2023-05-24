@@ -6,8 +6,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.broadinstitute.pgen.PgenWriter.PgenWriteMode;
@@ -202,12 +204,11 @@ public class TestUtils {
         final Process process = Runtime.getRuntime().exec(runCommand);
         final int retCode = process.waitFor();
         if (retCode != 0) {
+            // propagate any errors to stderr
             try (final InputStream errStream = process.getErrorStream();
-                 final BufferedReader bufferedReader = new BufferedLineReader(errStream)) {
-                while (bufferedReader.ready()) {
-                    /// propagate any errors to stderr
-                    final String s = bufferedReader.readLine();
-                    System.err.println(s);
+                 final BufferedReader errBufferedReader = new BufferedLineReader(errStream)) {
+                while (errBufferedReader.ready()) {
+                    System.err.println(errBufferedReader.readLine());
                 }        
             }
         }
@@ -220,6 +221,15 @@ public class TestUtils {
         try (final VCFFileReader jniReader = new VCFFileReader(expectedVCF, false);
              final CloseableIterator<VariantContext> jniIt = jniReader.iterator()) {
             try (final VCFFileReader plinkReader = new VCFFileReader(actualVCF, false)) {
+                final VCFHeader jniHeader = jniReader.getFileHeader();
+                final VCFHeader plinkHeader = plinkReader.getFileHeader();
+                final HashMap<String, Integer> plinkOffsetMap = plinkHeader.getSampleNameToOffset();
+                final HashMap<String, Integer> jniOffsetMap = jniHeader.getSampleNameToOffset();
+                // ensure that our samples are in the same order in the headers, even though I suppose thats not strictly required
+                for (final Map.Entry<String, Integer> entry : plinkOffsetMap.entrySet()) {
+                    Assert.assertEquals(entry.getValue(), jniOffsetMap.get(entry.getKey()));
+                }
+
                 for (final VariantContext plinkVariant : plinkReader) {
                     if (!jniIt.hasNext()) {
                         throw new IllegalStateException("No corresponding jni variant for plink variant: " + plinkVariant);
@@ -232,7 +242,7 @@ public class TestUtils {
         }
     }
 
-    //Asserts that the two provided VariantContext objects have equalsite/position and equal genotypes (other attributes are ignored)
+    //Asserts that the two provided VariantContext objects have equal site/position and concordant genotypes (other attributes are ignored)
     public static void assertVariantContextsAreNominallyEqual( final VariantContext actual, final VariantContext expected, final boolean ignorePhasing ) {
         Assert.assertNotNull(actual, "VariantContext expected not null");
         Assert.assertEquals(actual.getContig(), expected.getContig(), "chr");

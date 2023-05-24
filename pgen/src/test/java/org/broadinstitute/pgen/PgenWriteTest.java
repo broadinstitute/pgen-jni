@@ -95,7 +95,7 @@ public class PgenWriteTest {
             { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr M" },
             { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, "--output-chr M" },
  
-            // larger still, includes ~6000 multiallelic sites (~117,932 variants/10 samples)
+            // larger still, unphased, includes ~6000 multiallelic sites (~117,932 variants/10 samples)
             { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26" },
             { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26" },
 
@@ -104,8 +104,7 @@ public class PgenWriteTest {
             // is not referenced by any genotype, and the (multi-allelic) variant at site 179170076 modified so the middle (index 1) allele is not
             // referenced by any genotype; this triggers the issue described https://groups.google.com/g/plink2-users/c/Sn5qVCyDlDw/m/GOWScY6tAQAJ
             // currently this fails because we haven't picked up the new plink code with the fix (described here
-            // https://groups.google.com/g/plink2-users/c/Sn5qVCyDlDw/m/GOWScY6tAQAJ); this should be fixed the next time we update to new code
-            // and a newer version of plink2, and then this test can be enabled
+            // https://groups.google.com/g/plink2-users/c/Sn5qVCyDlDw/m/GOWScY6tAQAJ)
             { Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26" }
         };
     }
