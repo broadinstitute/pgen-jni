@@ -137,10 +137,10 @@ public class PgenWriteTest {
         // plink2)
         final Path vcfFromPGEN_jni = TestUtils.pgenToVCF_plink2(jniFileSet, "FromJNI", extraPlinkArgs);
         final Path vcfFromPGEN_plink2 = TestUtils.pgenToVCF_plink2(plink2FileSet, "FromPlink2", extraPlinkArgs);
-        TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, vcfFromPGEN_plink2);
+        TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, vcfFromPGEN_plink2, true);
 
         // finally, for extra measure, compare the pgen-jni round-tripped VCF with the ORIGINAL VCF
-        TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, originalVCF);
+        TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, originalVCF, true);
     }
 
    @Test(expectedExceptions = PgenJniException.class)
