@@ -50,8 +50,9 @@ namespace pgenlib {
             const typename MAP::mapped_type& defval)
     {
         typename MAP::const_iterator it = m.find(key);
-        if (it == m.end())
+        if (it == m.end()) {
             return defval;
+        }
         return it->second;
     }
 
