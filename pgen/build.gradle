@@ -37,7 +37,7 @@ tasks.withType(CppCompile).configureEach {
     // For now, reach into the private headers folder of pgen-lib and call functions there directly.
     // Eventually, pgen-lib should expose a public API via .h files in it's "public" include folder,
     // and this can be removed (the dev.nokee plugin appears to automatically include the "public"
-    // folder of any dependent project in the -I list for this project automatically).
+    // folder of any dependent project in the -I list for this project).
     includes {
         "${project(':pgen-lib').projectDir}/src/main/headers"
     }

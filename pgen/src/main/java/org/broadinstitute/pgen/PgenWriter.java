@@ -105,7 +105,7 @@ public class PgenWriter implements VariantContextWriter {
 
         pgenContextHandle = openPgen(pgenFile.getRawInputString(), pgenWriteMode.value(), numberOfVariants, vcfHeader.getNGenotypeSamples(), maxAltAlleles);
         if (pgenContextHandle == 0) {
-            //openPgen wthrew an async Java exception
+            //openPgen threw an async Java exception
             return;
         }
         alleleBuffer = createBuffer(vcfHeader.getNGenotypeSamples() * 2 * 4); //samples * ploidy * bytes in int32_t (sizeof AlleleCode)
@@ -137,13 +137,19 @@ public class PgenWriter implements VariantContextWriter {
         pVarWriter.close();
         pVarWriter = null;
 
-        // tell the writer how many variants we dropped (due to exceeding the # of alternate alleles) so it
+        // closePgen returns false if it had to throw an async Java exception, so test for that, and if it failed,
+        // don't do anything else that might throw.
+        //
+        // Tell the writer how many variants we dropped (due to exceeding the # of alternate alleles) so it
         // doesn't throw if the number written doesn't match the number expected (which is provided when the
         // writer is opened)
-        closePgen(pgenContextHandle, droppedVariantCount);
-        pgenContextHandle = 0;
-        destroyByteBuffer(alleleBuffer);
-        alleleBuffer = null;
+        if (closePgen(pgenContextHandle, droppedVariantCount)) {
+            pgenContextHandle = 0;
+            //destroyByteBuffer might returned false if for some reason it has to throw an async Java exception, but
+            // we don't need to test for that here since we're only nulling out a variable on return
+            destroyByteBuffer(alleleBuffer);
+            alleleBuffer = null;    
+        }
     }
 
     @Override

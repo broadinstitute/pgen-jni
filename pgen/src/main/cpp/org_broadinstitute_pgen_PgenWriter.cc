@@ -30,9 +30,9 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass object,
         PgenContext* const pgenContext = openPgen(cFilename, pgenWriteModeInt, numberOfVariants, sampleCount, maxAltAlleles);
         env->ReleaseStringUTFChars (filename, cFilename);
         pgenHandle = reinterpret_cast<jlong>(pgenContext);
-    } catch (PgenException& e) {
+    } catch (const PgenException& e) {
         env->ReleaseStringUTFChars (filename, cFilename);
-        reThrowAsJavaException(env, e, "Native code failure opening pgen context");
+        reThrowAsAsyncJavaException(env, e, "Native code failure opening pgen context");
         pgenHandle = 0L;
     }
     return pgenHandle;
@@ -45,14 +45,14 @@ Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv *env, jclass object
                                                       jint alleleCount){
     const int32_t *allele_codes = reinterpret_cast<int32_t*>(env->GetDirectBufferAddress(alleleBuffer));
     if ( !allele_codes ) {
-        throwJavaException(env, "Native code failure getting address for allele codes in appendAlleles");
+        throwAsyncJavaException(env, "Native code failure getting address for allele codes in appendAlleles");
     } else {
         PgenContext *pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
         try {
             appendAlleles(pgenContext, allele_codes, alleleCount);
             return true;
-        } catch (PgenException &e) {
-            reThrowAsJavaException(env, e, "Native code failure in appendAlleles");
+        } catch (const PgenException &e) {
+            reThrowAsAsyncJavaException(env, e, "Native code failure in appendAlleles");
             return false;
         }
     }
@@ -64,8 +64,8 @@ Java_org_broadinstitute_pgen_PgenWriter_closePgen(JNIEnv *env, jclass object, jl
     try {
         closePgen(pgenContext, droppedVariantCount);
         return true;
-    } catch (PgenException &e) {
-        reThrowAsJavaException(env, e, "Native code failure closing pgen context");
+    } catch (const PgenException &e) {
+        reThrowAsAsyncJavaException(env, e, "Native code failure closing pgen context");
         return false;
     }
 }
@@ -81,7 +81,7 @@ JNIEXPORT jobject JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_createBuffer( JNIEnv *env, jclass cls, jint length ) {
     void *buf = malloc(length);
     if ( !buf ) {
-        throwJavaException(env, "Native code failure allocating memory for ByteBuffer");
+        throwAsyncJavaException(env, "Native code failure allocating memory for ByteBuffer");
         return nullptr;
     }
     return env->NewDirectByteBuffer(buf, length);
@@ -91,7 +91,7 @@ JNIEXPORT jboolean JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_destroyByteBuffer( JNIEnv *env, jclass cls, jobject byteBuf ) {
     void *buf = env->GetDirectBufferAddress(byteBuf);
     if ( !buf ) {
-        throwJavaException(env, "Native code failure getting ByteBuffer address to free");
+        throwAsyncJavaException(env, "Native code failure getting ByteBuffer address to free");
         return false;
     }
     free(buf);

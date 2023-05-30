@@ -25,25 +25,33 @@ namespace pgenlib {
         plink2::PgenWriteMode pgenWriteMode = validatePgenWriteMode(pgenWriteModeInt);
         if (sampleCount < 1) {
             char errMessageBuff[kErrMessageBufSize];
-            snprintf(errMessageBuff, kErrMessageBufSize, "Invalid sample count: %d. At least 1 sample is required.",
+            snprintf(errMessageBuff,
+                     kErrMessageBufSize,
+                     "Invalid sample count: %d. At least 1 sample is required.",
                      sampleCount);
-            throw PgenException(errMessageBuff);
+            throw PgenException(errMessageBuff); // PgenException makes a copy of errMessageBuff
         } else if (variantCount < 1) {
             char errMessageBuff[kErrMessageBufSize];
-            snprintf(errMessageBuff, kErrMessageBufSize, "Invalid variant count: %ld. Variant count must be > 0.",
+            snprintf(errMessageBuff,
+                     kErrMessageBufSize,
+                     "Invalid variant count: %ld. Variant count must be > 0.",
                      variantCount);
-            throw PgenException(errMessageBuff);
+            throw PgenException(errMessageBuff);  // PgenException makes a copy of errMessageBuff
         } else if (variantCount > plink2::kPglMaxVariantCt) {
             char errMessageBuff[kErrMessageBufSize];
-            snprintf(errMessageBuff, kErrMessageBufSize, "Invalid variant count: %ld exceeds maximum allowable variant count: %d.",
+            snprintf(errMessageBuff,
+                     kErrMessageBufSize,
+                     "Invalid variant count: %ld exceeds maximum allowable variant count: %d.",
                      variantCount,
                      plink2::kPglMaxVariantCt);
-            throw PgenException(errMessageBuff);
+            throw PgenException(errMessageBuff); // PgenException makes a copy of errMessageBuff
         } else if (maxAltAlleles < 2) {
             char errMessageBuff[kErrMessageBufSize];
-            snprintf(errMessageBuff, kErrMessageBufSize, "Invalid max alt allele count: %d must be at least 2.",
+            snprintf(errMessageBuff,
+                     kErrMessageBufSize,
+                     "Invalid max alt allele count: %d must be at least 2.",
                      maxAltAlleles);
-            throw PgenException(errMessageBuff);
+            throw PgenException(errMessageBuff);  // PgenException makes a copy of errMessageBuff
         } else if (maxAltAlleles > plink2::kPglMaxAltAlleleCt) {
             char errMessageBuff[kErrMessageBufSize];
             snprintf(errMessageBuff,
@@ -51,7 +59,7 @@ namespace pgenlib {
                      "Invalid max alt allele count: %d exceeds maximum allowable alt allele count: %d.",
                      maxAltAlleles,
                      plink2::kPglMaxAltAlleleCt);
-            throw PgenException(errMessageBuff);
+            throw PgenException(errMessageBuff);  // PgenException makes a copy of errMessageBuff
         }
 
         PgenContext* pGenContext = static_cast<PgenContext *const>(malloc(sizeof(PgenContext)));
@@ -72,7 +80,6 @@ namespace pgenlib {
 
         //TODO: what is non_ref_strage_flags values 1, 2, 3 ?
 
-        //plink2::DivUp(uintptr_t val, uint32_t divisor)
         uint32_t bitvec_cacheline_ct = plink2::DivUp(pGenContext->sampleCount, plink2::kBitsPerCacheline);
         uintptr_t alloc_cacheline_ct = 0;
         const plink2::PglErr init1Result = plink2::SpgwInitPhase1(cFilename, //filename
@@ -116,7 +123,7 @@ namespace pgenlib {
         spgw_alloc_iter = &(spgw_alloc_iter[bitvec_cacheline_ct * plink2::kCacheline]);
         pGenContext->patch_10_vals = (plink2::AlleleCode*) spgw_alloc_iter;
 
-        // we're not using the phase info...yet
+        // we're not using the phase info yet
         spgw_alloc_iter = &(spgw_alloc_iter[patch_10_vals_cacheline_ct * plink2::kCacheline]);
         pGenContext->phasepresent = (uintptr_t *) spgw_alloc_iter;
         spgw_alloc_iter = &(spgw_alloc_iter[bitvec_cacheline_ct * plink2::kCacheline]);
@@ -139,7 +146,7 @@ namespace pgenlib {
         return pGenContext;
     }
 
-    // AFAICT, allele_ct here is the total number of possible allele values, not the number of unique alleles
+    // allele_ct here is the total number of possible allele values, not the number of unique alleles
     // that are ACTUALLY observed/present in allele_codes
     void appendAlleles(const PgenContext *const pGenContext, const int32_t* allele_codes, const int32_t allele_ct) {
         //TODO: for now just declare allPhased == false since there is no phaseinfo provided;
@@ -254,7 +261,7 @@ namespace pgenlib {
         if ((declaredVariantCt - droppedVariantCt) != writtenVariantCt) {
             //TODO: the plink2 python implementation throws on close if you haven't written as many variants as you
             // initially claimed you would, so we do too (after accounting for variants dropped due to exceeding the
-            // maximum allele threshold). but we've come this far - do we REALLY want to throw now ???
+            // maximum allele threshold). But, we've come this far - do we REALLY want to throw now ???
             char errMessage[kErrMessageBufSize];
             snprintf(reservedForExceptionMessage,
                      kErrMessageBufSize,
