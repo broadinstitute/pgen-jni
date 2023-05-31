@@ -6,7 +6,7 @@
 
 namespace pgenlib {
 
-    // calleable via jni
+    // the public interface to the pgen writer
     PgenContext *openPgen(const char *cFilename, const int pgenWriteModeInt, const long variantCount, const int sampleCount, const int maxAltAlleles);
     void appendAlleles(const PgenContext *const pGenContext, const int32_t* allele_codes, int32_t allele_ct);
     void closePgen(const PgenContext *const pGenContext, const long nDroppedVariants);

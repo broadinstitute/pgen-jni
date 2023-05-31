@@ -1,12 +1,59 @@
 # pgen-jni
-Experimental jni wrapper of PGEN libraries
 
-Work in Progress to provide PGEN Writer/Reader in java.
+A Java PGEN writer, for writing [HTSJDK](https://github.com/samtools/htsjdk)
+[VariantContext](https://github.com/samtools/htsjdk/blob/master/src/main/java/htsjdk/variant/variantcontext/writer/VariantContextWriter.java)
+objects to a [plink2](https://www.cog-genomics.org/plink/2.0) [PGEN](https://www.cog-genomics.org/plink/2.0/input#pgen)
+file. The Java writer component implements the [HTSJDK](https://github.com/samtools/htsjdk)
+[VariantContext](https://github.com/samtools/htsjdk/blob/master/src/main/java/htsjdk/variant/variantcontext/writer/VariantContextWriter.java)
+interface. See the plink2 pgen [spec](https://github.com/chrchang/plink-ng/tree/master/pgen_spec) for more information about the PGEN file format.
+
+The Java writer implementation uses an underlying native component, which is built here from a combination of local
+source files, plus some source files taken directly from the plink2 (that are used by plink2 to build the pgen-lib target).
+## Artifacts
+
+### Supported platforms:
+- linux 64
+- macos 64
+
+aarm64 is not yet supported.
+
+The generated artifacts are:
+- pgen.jar (Java jar)
+  - libpgen.dylib (for macOS 64-bit)
+  - libpgen.so  (for Linux 64-bit Intel1)
+### Building pgen-jni
+
+Building requires a Java 17+ JDK, a C++11-compatible compiler, boost, and a recent [plink2](https://www.cog-genomics.org/plink/2.0/)
+executeable (must be on the path). The pgen-lib C++ unit tests require boost to be installed in /usr/local/boost.
+
+Currently, the project only builds components for the architecture on which the build is running. A [Docker file]() is provided to
+allow the components to be built on Linux.
+### Projects
 
 There are two (gradle) sub-projects:
-  - pgen: the Java/JNI layer, which consists of Java code plus a thin C++ layer that delegates to pgen-lib,
-	  with Java unit tests
-  - pgen-lib: a pure C++ layer that is independent of JNI, with C++/boost unit tests 
+- pgen: The Java/JNI layer, which consists of Java code, plus a thin C++ layer that delegates to pgen-lib,
+with Java unit tests
+- pgen-lib: A pure C/C++ layer, with C++/boost unit tests. This layer has no Java/JNI 
+dependencies, and can be compiled, tested, and deployed independent of the pgen Java components.
 
-The C++ unit tests require boost, which must be installed in /usr/local/boost.
+The two sub-projects have separate tests (testNG for the pgen Java layer, and C++/boost for the pgen-lib unit tests).
+For development and test execution, it is recommended to treat these are two separate projects, using the VSCode editor for the Java
+pgen project, and CLion or other C++ compatible IDE for the pgen-lib project and boost tests.
+
+The [dev-nokee](https://docs.nokee.dev/manual/jni-library-plugin.html) gradle plugin is used to build the entire project as a single unit
+(currently this only builds the native components for the architecture on which is its running; either macos or Linux), and to run the
+aggregate test suite (`./gradle clean test` will build and run both sets for tests for the current architecture).
+
+#### pgen
+The Java tests require the presence of a plink2 executeable on the local device; this is used for varius validation and concordance
+tests that are run as part of the test suite.
+
+##### pgen-lib
+There are two C++ namespaces exposed to callers of the C++ code in pgen-lib:
+- pgenlib - the C/C++ calleable types and functions that are used by the JNI layer (and implemented in the pgen-lib subproject)
+- plink2 - the C/C++ types and functions that are part of the plink2 implementation, that are used by the pgenlib implementation
+
+
+
+
 

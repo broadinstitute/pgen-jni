@@ -1,4 +1,3 @@
-#include <iostream>
 #include <cmath>
 
 using namespace std;
@@ -20,6 +19,48 @@ namespace pgenlib {
             const int maxAltAlleles);
     static const int kErrMessageBufSize = 1024;
 
+    /**
+     * Start a new PGEN write session, and return a pointer to a PgenContext for the writer.
+     *
+     * The PgenContext can be used to write an entire pgen file. depending on
+     * the pgen file mode used (see below) a .pgen.pgi file may also be created.
+     *
+     * Only diploid genomes are supported.
+     *
+     * The allele codes for the genotypes for each variant can be provided by passing the PgenContext returned by
+     * this function to a series of calls to appendAlleles, after which the PgenContext session should be closed
+     * via a call to closePgen.
+     *
+     * An example pgen writer lifecyle is illustrated here:
+     *
+     *      const pgenlib::PgenContext *const pgen_context = pgenlib::openPgen(
+     *          file_name,
+     *          pgen_file_mode,
+     *          n_variants,
+     *          n_samples,
+     *          plink2::kPglMaxAltAlleleCt);
+     *
+     *      for (int i = 0; i < n_variants; i++) {
+     *          pgenlib::appendAlleles(pgen_context, allele_codes, allele_ct);
+     *      }
+     *      long variantCount = getNumberOfVariantsWritten(pgen_context);
+     *      closePgen(pgen_context, 0);
+     *
+     *  Once the PgenContext has been closed, it can no longer be used to write allele codes.
+     *
+     * @param cFilename - the pgen file to write
+     * @param pgenWriteModeInt - an integer representing the file mode, with permitted values drawn from integer
+     * values of plink2::PgenWriteMode (1, 2 or 3). An exception will be thrown if any other value is provided. this
+     * determines the pgen file mode that is used (i.e, whether there is a separate .pgi index)
+     * @param variantCount - the number of variant to be written. if fewer variants are written, an exception will
+     * be thrown when the writer is closed by a call to closePgen. must be in the range 1..plink2::kPglMaxVariantCt
+     * @param sampleCount - the number of samples (genotypes) in the data set. Must be > 0.
+     * @param maxAltAlleles - the maximum number of alleles for any variant that will be written - this determines the
+     * range of valid (zero based) allele codes that can be provided when writing genotypes to this writer. Must be
+     * in the range 2..plink2::kPglMaxAltAlleleCt
+     *
+     * @return a PgenContext
+     */
     PgenContext *openPgen(
             const char* cFilename,
             const int pgenWriteModeInt,
@@ -162,8 +203,14 @@ namespace pgenlib {
         return pGenContext;
     }
 
-    // allele_ct here is the total number of possible allele values, not the number of unique alleles
-    // that are ACTUALLY observed/present in allele_codes
+    /**
+     * Append on variant's worth of allele code (genotypes) to a pgen file.
+     *
+     * @param pGenContext - the PgenContext for the writer
+     * @param allele_codes - array of allele codes to be written
+     * @param allele_ct - the number of possible allele values for this variant (not the number of unique alleles
+     * that are ACTUALLY observed/present in allele_codes)
+     */
     void appendAlleles(const PgenContext *const pGenContext, const int32_t* allele_codes, const int32_t allele_ct) {
         //TODO: for now just declare allPhased == false since there is no phaseinfo provided;
         bool allPhased = false;
@@ -269,6 +316,14 @@ namespace pgenlib {
         throwOnPglErr(pglErr, "appendAlleles");
     }
 
+    /**
+     * Close a pGenContext, flush the output, and close the pgen file.
+     *
+     * @param pGenContext - the pgen context for this writer
+     * @param numVariantsDropped - the number of variants dropped (the number f variants dropped, plus the number
+     * of variants written, must equal the number of variants projected to be written when the pgen context was
+     * initially opened. otherwise a pgenlib::PGenException will be thrown.
+     */
     void closePgen(const PgenContext *const pGenContext, const long numVariantsDropped) {
         const uint32_t declaredVariantCt = plink2::SpgwGetVariantCt(pGenContext->spgwp);
         const uint32_t writtenVariantCt = plink2::SpgwGetVidx(pGenContext->spgwp);
