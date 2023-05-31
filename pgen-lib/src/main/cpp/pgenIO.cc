@@ -12,6 +12,12 @@ using namespace std;
 namespace pgenlib {
 
     plink2::PgenWriteMode validatePgenWriteMode(const uint32_t anInt);
+    PgenContext *initPgenContext(
+            const char* cFilename,
+            const plink2::PgenWriteMode pgenWriteMode,
+            const long variantCount,
+            const int sampleCount,
+            const int maxAltAlleles);
     static const int kErrMessageBufSize = 1024;
 
     PgenContext *openPgen(
@@ -61,6 +67,16 @@ namespace pgenlib {
                      plink2::kPglMaxAltAlleleCt);
             throw PgenException(errMessageBuff);  // PgenException makes a copy of errMessageBuff
         }
+
+        return initPgenContext(cFilename, pgenWriteMode, variantCount, sampleCount, maxAltAlleles);
+    }
+
+    PgenContext *initPgenContext(
+            const char* cFilename,
+            const plink2::PgenWriteMode pgenWriteMode,
+            const long variantCount,
+            const int sampleCount,
+            const int maxAltAlleles) {
 
         PgenContext* pGenContext = static_cast<PgenContext *const>(malloc(sizeof(PgenContext)));
         if (pGenContext == nullptr) {
