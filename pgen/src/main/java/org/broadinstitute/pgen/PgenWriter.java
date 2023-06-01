@@ -29,10 +29,27 @@ import java.util.List;
 import java.util.Map;
 //import java.util.Set;
 
+/**
+ * An [HTSJDK](https://github.com/samtools/htsjdk) [VariantContextWriter]
+ * (https://github.com/samtools/htsjdk/blob/master/src/main/java/htsjdk/variant/variantcontext/writer/VariantContextWriter.java)
+ * that writes [VariantContext](https://github.com/samtools/htsjdk/blob/master/src/main/java/htsjdk/variant/variantcontext/VariantContext.java)
+ * objects to a file in the [plink2](https://www.cog-genomics.org/plink/2.0) in the plink2 PGEN format. See the plink2 PGEN
+ * [spec](https://github.com/chrchang/plink-ng/tree/master/pgen_spec) for more information about the PGEN file format.
+ * 
+ * The writer implementation uses an underlying native component, which is built from a combination of local source files,
+ * plus some source files taken directly from the plink2 (that are used by plink2 to build the pgen-lib target). Only
+ * specific platforms are supported.
+*/
 public class PgenWriter implements VariantContextWriter {
     private static Log logger = Log.getInstance(PgenWriter.class);
 
+    /**
+     * 
+     */
     public static final int PLINK2_NO_CALL_VALUE = -9;
+    /**
+     * the maximum number of alternate alleles that plink2/pgen can handle (this is defined by plink2)
+     */
     public static final int PLINK2_MAX_ALTERNATE_ALLELES = 254;  // plink2::kPglMaxAltAlleleCt
 
     public static String PGEN_EXTENSION = ".pgen";
@@ -40,10 +57,22 @@ public class PgenWriter implements VariantContextWriter {
     public static String PVAR_EXTENSION = ".pvar";
     public static String PSAM_EXTENSION = ".psam";
  
-    // enum for the plink2 pgen write modes
+    /**
+     * Enum for representing the plink2 pgen file write modes. See plink2::PgenWriteMode.
+     */
     public enum PgenWriteMode {
+        /**
+         * requires backward seeks when writing
+         */
         PGEN_FILE_MODE_BACKWARD_SEEK(0),
+        /**
+         * write a separate .pgi index file
+         */
         PGEN_FILE_MODE_WRITE_SEPARATE_INDEX(1),
+        /**
+         * the final real .pgen is only created at the end, by writing the index and then appending the body of the first
+         * temporary .pgen (which is then deleted).
+         */
         PGEN_FILE_MODE_WRITE_AND_COPY(2); 
 
         private final int mode;
@@ -66,9 +95,6 @@ public class PgenWriter implements VariantContextWriter {
     // ******************** Native JNI methods  ********************
     private static native long openPgen(String file, int pgenWriteModeInt, long numberOfVariants, int numberOfSamples, int maxAltAlleles);
     private static native boolean closePgen(long pgenContextHandle, long numDroppedVariants);
-    /**
-     * @return the number of variants actually written to the pgen
-     */
     private static native long getPgenVariantCount(long pgenContextHandle);
     private static native boolean appendAlleles(long pgenContextHandle, ByteBuffer alleles, int alleleCount);
     private static native ByteBuffer createBuffer(int length);
@@ -79,7 +105,16 @@ public class PgenWriter implements VariantContextWriter {
         System.loadLibrary("pgen");
     }
 
-    // doesn't preserve phasing
+    /**
+     * Create a PGEN writer. The writer creats a PGEN file set (.pgen and .pvar/.psam files). Depending on the file
+     * mode used, may also create a .pgen.pgi file.
+     * 
+     * Supports only diploid sites with fewer than {@code PLINK2_MAX_ALTERNATE_ALLELES} (this value can be
+     * furhter limited using {@code maxAltAlleles}. Sites that exceed this number are silently dropped.
+     * limit are silently dropped).
+     * 
+     * NOTE: Currently this wrier doesn't preserve genotype phasing.
+     */
     public PgenWriter(
         final HtsPath pgenFile,
         final VCFHeader vcfHeader,
@@ -234,24 +269,29 @@ public class PgenWriter implements VariantContextWriter {
     }
 
    /**
-     * @return the number of variants dropped due to exceeding the max alternate allele count
+     * @return the number of variants dropped because they exceeded the max alternate allele count
      */
     public long getDroppedVariantCount() { return droppedVariantCount; }
 
      /**
      * @return the number of variants actually written to the pgen
      * 
-     * Delegate to the pgen-lib code to get the actual number recorded by the pgen library code.
+     * Delegates to the pgen-lib code to get the actual number recorded by the pgen library code.
      */
     public long getWrittenVariantCount() { return getPgenVariantCount(pgenContextHandle); }
 
-    // given a Path, return the absolute path of the file, without the trailing extension
+    /**
+     * given a Path, return the absolute path of the file, without the trailing extension
+     */
+    // Visible for testing
     public static String getAbsoluteFileNameWithoutExtension(final Path targetPath, final String extension) {
         final String targetAbsolutePath = targetPath.toAbsolutePath().toString();
         return targetAbsolutePath.substring(0, targetAbsolutePath.lastIndexOf(extension));
     }
     
-    // create the .pvar
+    /**
+     * Create a .pvar companion file for {@code pgenFile}.
+     */
     private HtsPath createPVAR(final HtsPath pgenFile, final VCFHeader vcfHeader) {
         final String pgenFilePrefix = getAbsoluteFileNameWithoutExtension(pgenFile.toPath(), PGEN_EXTENSION);
         final HtsPath pVarFile = new HtsPath(pgenFile.toPath()
@@ -267,7 +307,9 @@ public class PgenWriter implements VariantContextWriter {
         return pVarFile;
     }
 
-    // write the entire psam out
+    /**
+     * Create and writes a .psam companion file for {@code pgenFile}.
+     */
     private HtsPath writePSAM(final HtsPath pgenFile, final VCFHeader vcfHeader) {
         final String PSAM_HEADER_LINE = "#IID\tSEX\n";
         final String PSAM_DETAIL_LINE = "\tN/A\n";

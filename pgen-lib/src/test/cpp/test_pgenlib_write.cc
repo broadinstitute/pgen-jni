@@ -13,6 +13,9 @@
 using namespace boost::unit_test;
 using namespace pgenlib;
 
+// Unit level tests for the PGEN writer. Note that most of the actual validation and round trip concordance
+// verification is done by the Java tests in the enclosing Java project.
+
 //******************* Forward Declarations/Constants *******************
 constexpr int TMP_FILENAME_SIZE = 4096;
 template<size_t N> void createTempFile(const char* const nameTemplate, char (&outputFileName)[N]);
@@ -75,6 +78,7 @@ BOOST_DATA_TEST_CASE(test_write_unphased_biallelic_small, s_pgenFileMode) {
     BOOST_REQUIRE_EQUAL(variantCount, n_variants);
 }
 
+// verify the issue described here: https://groups.google.com/g/plink2-users/c/Sn5qVCyDlDw/m/GOWScY6tAQAJ for bi-allelics
 BOOST_AUTO_TEST_CASE(test_biallelic_one_allele_not_observed) {
     constexpr long n_variants = 6;
     constexpr int n_samples = 3;
@@ -86,6 +90,7 @@ BOOST_AUTO_TEST_CASE(test_biallelic_one_allele_not_observed) {
     test_write_unphased_pgen(allele_codes, n_alleles, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount);
 }
 
+// verify issue described here: https://groups.google.com/g/plink2-users/c/Sn5qVCyDlDw/m/GOWScY6tAQAJ for multi-allelics
 BOOST_AUTO_TEST_CASE(test_multiallelic_some_alleles_not_observed) {
     constexpr long n_variants = 6;
     constexpr int n_samples = 3;
@@ -129,7 +134,7 @@ BOOST_AUTO_TEST_CASE(test_write_unphased_multi_allelic_large) {
     BOOST_REQUIRE_EQUAL(variantCount, n_variants);
 }
 
-// say we're going to write 10 variants, but don't write them
+// claim that we're going to write 10 variants, but then don't write them
 BOOST_AUTO_TEST_CASE(test_close_with_no_writes) {
     const char* const expectedNoWriteMessage = "closePgen called with number of variants written";
     char tmpFileName[TMP_FILENAME_SIZE];

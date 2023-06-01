@@ -317,7 +317,7 @@ namespace pgenlib {
     }
 
     /**
-     * Close a pGenContext, flush the output, and close the pgen file.
+     * Close a pGenContext, flush the output, and close the pgen file. The pGenContext is no longer valid after this call.
      *
      * @param pGenContext - the pgen context for this writer
      * @param numVariantsDropped - the number of variants dropped (the number f variants dropped, plus the number
