@@ -77,14 +77,14 @@ namespace pgenlib {
                      "Invalid sample count: %d. At least 1 sample is required.",
                      sampleCount);
             throw PgenException(errMessageBuff); // PgenException makes a copy of errMessageBuff
-        } else if (variantCount < 1) {
+        } else if (variantCount < 1L) {
             char errMessageBuff[kErrMessageBufSize];
             snprintf(errMessageBuff,
                      kErrMessageBufSize,
                      "Invalid variant count: %ld. Variant count must be > 0.",
                      variantCount);
             throw PgenException(errMessageBuff);  // PgenException makes a copy of errMessageBuff
-        } else if (variantCount > plink2::kPglMaxVariantCt) {
+        } else if (variantCount > static_cast<long>(plink2::kPglMaxVariantCt)) {
             char errMessageBuff[kErrMessageBufSize];
             snprintf(errMessageBuff,
                      kErrMessageBufSize,
@@ -334,14 +334,14 @@ namespace pgenlib {
             // initially claimed you would, so we do too (after accounting for variants dropped due to exceeding the
             // maximum allele threshold). But, we've come this far - do we REALLY want to throw now ???
             char errMessage[kErrMessageBufSize];
-            snprintf(reservedForExceptionMessage,
+            snprintf(errMessage,
                      kErrMessageBufSize,
                       "closePgen called with number of variants written (%d) not equal to (declared - dropped)  (%d - %d = %d)",
                       writtenVariantCt,
                       declaredVariantCt,
                       droppedVariantCt,
                       declaredVariantCt - droppedVariantCt);
-            throw PgenException(reservedForExceptionMessage);
+            throw PgenException(errMessage);
         }
 
         throwOnPglErr(SpgwFinish(pGenContext->spgwp), "Error closing pgen file: SpgwFinish");
