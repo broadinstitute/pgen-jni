@@ -4,7 +4,6 @@
 #include "pgenIO.h"
 #include "pgenContext.h"
 #include "pgenException.h"
-#include "pgenlib_write.h"
 
 using namespace pgenlib;
 
