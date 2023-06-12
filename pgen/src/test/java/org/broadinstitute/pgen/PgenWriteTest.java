@@ -208,7 +208,7 @@ public class PgenWriteTest {
     // case you're required to provide a variant count up front, and then write that many variants), but this is using write
     // mode PGEN_FILE_MODE_WRITE_SEPARATE_INDEX.
     //
-    // Disabled because this triggers an assert:
+    // Disabled because this triggers an assert down in plink2:
     // Assertion failed: (variant_ct), function PwcFinish, file pgenlib_write.cc, line 2284.
     @Test(enabled = false)
     public void testNoWritesWithoutVariantCount() throws IOException {
