@@ -13,8 +13,8 @@
 using namespace boost::unit_test;
 using namespace pgenlib;
 
-// Unit level tests for the PGEN writer. Note that most of the actual validation and round trip concordance
-// verification is done by the Java tests in the enclosing Java project.
+// Unit level tests for the PGEN writer. Very little validation of the resulting pgen files is done here; the
+// Java tests in the enclosing Java project do the actual validation and round trip concordance verification.
 
 //******************* Forward Declarations/Constants *******************
 constexpr int TMP_FILENAME_SIZE = 4096;
@@ -59,7 +59,7 @@ BOOST_AUTO_TEST_CASE(test_pglerr_string_conversion) {
 }
 
 // write a small, bi-allelic pgen file, once with each possible file write mode
-static constexpr boost::array<int, 3> s_pgenFileMode {
+constexpr boost::array<int, 3> s_pgenFileMode {
     PGEN_FILE_MODE_BACKWARD_SEEK,
     PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
     PGEN_FILE_MODE_WRITE_AND_COPY
@@ -173,7 +173,7 @@ BOOST_AUTO_TEST_CASE(test_invalid_allele_code) {
 }
 
 // use a bogus pgen write mode
-BOOST_AUTO_TEST_CASE(test_invalid_write_mode) {
+BOOST_AUTO_TEST_CASE(test_undefined_write_mode) {
     const char* const expectedInvalidModeMessage = "Invalid pgenWriteMode";
     char tmpFileName[TMP_FILENAME_SIZE];
     createTempFile("test_write.pgen", tmpFileName);
@@ -188,6 +188,21 @@ BOOST_AUTO_TEST_CASE(test_invalid_write_mode) {
     );
 }
 
+// use pgen write mode 0 (seek) with an unknown variant count
+BOOST_AUTO_TEST_CASE(test_seek_write_mode_requires_known_variant_count) {
+    const char* const expectedInvalidModeMessage = "requires a known variant count";
+    char tmpFileName[TMP_FILENAME_SIZE];
+    createTempFile("test_write.pgen", tmpFileName);
+    unlink(tmpFileName);
+    BOOST_REQUIRE_EXCEPTION(
+            pgenlib::openPgen(tmpFileName, PGEN_FILE_MODE_BACKWARD_SEEK, static_cast<long>(plink2::kPglMaxVariantCt), 3, plink2::kPglMaxAltAlleleCt),
+            PgenException,
+            [expectedInvalidModeMessage](PgenException ex) -> bool  {
+                return strstr(ex.what(), expectedInvalidModeMessage);
+            }
+    );
+}
+
 BOOST_AUTO_TEST_CASE(test_invalid_sample_count) {
     const char* const expectedInvalidSampleCountMessage = "Invalid sample count";
     char tmpFileName[TMP_FILENAME_SIZE];
@@ -195,7 +210,7 @@ BOOST_AUTO_TEST_CASE(test_invalid_sample_count) {
     unlink(tmpFileName);
     const int invalidSampleCount = 0; // must be >= 1
     BOOST_REQUIRE_EXCEPTION(
-            pgenlib::openPgen(tmpFileName, 1, 10L, invalidSampleCount, plink2::kPglMaxAltAlleleCt),
+            pgenlib::openPgen(tmpFileName, PGEN_FILE_MODE_WRITE_AND_COPY, 10L, invalidSampleCount, plink2::kPglMaxAltAlleleCt),
             PgenException,
             [expectedInvalidSampleCountMessage](PgenException ex) -> bool  {
                 return strstr(ex.what(), expectedInvalidSampleCountMessage);
@@ -210,7 +225,7 @@ BOOST_AUTO_TEST_CASE(test_invalid_variant_count) {
     unlink(tmpFileName);
     const long invalidVariantCount = 0; // must be >= 1
     BOOST_REQUIRE_EXCEPTION(
-            pgenlib::openPgen(tmpFileName, 1, invalidVariantCount, 3, plink2::kPglMaxAltAlleleCt),
+            pgenlib::openPgen(tmpFileName, PGEN_FILE_MODE_WRITE_AND_COPY, invalidVariantCount, 3, plink2::kPglMaxAltAlleleCt),
             PgenException,
             [expectedInvalidVariantCountMessage](PgenException ex) -> bool  {
                 return strstr(ex.what(), expectedInvalidVariantCountMessage);

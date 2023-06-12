@@ -5,19 +5,20 @@ using namespace std;
 #include "pgenContext.h"
 #include "pgenException.h"
 #include "pgenUtils.h"
+#include "pgenIO.h"
 #include "pgenlib_misc.h"
 #include "pgenlib_write.h"
 
 namespace pgenlib {
+    static const int kErrMessageBufSize = 1024;
+    static plink2::PgenWriteMode validatePgenWriteMode(const uint32_t pGenWriteMode, const long variantCount);
 
-    plink2::PgenWriteMode validatePgenWriteMode(const uint32_t anInt);
-    PgenContext *initPgenContext(
+    static PgenContext *initPgenContext(
             const char* cFilename,
             const plink2::PgenWriteMode pgenWriteMode,
             const long variantCount,
             const int sampleCount,
             const int maxAltAlleles);
-    static const int kErrMessageBufSize = 1024;
 
     /**
      * Start a new PGEN write session, and return a pointer to a PgenContext for the writer.
@@ -69,7 +70,7 @@ namespace pgenlib {
             const int maxAltAlleles) {
 
         // validate the requested pgen write mode, and sample and variant counts
-        plink2::PgenWriteMode pgenWriteMode = validatePgenWriteMode(pgenWriteModeInt);
+        plink2::PgenWriteMode pgenWriteMode = validatePgenWriteMode(pgenWriteModeInt, variantCount);
         if (sampleCount < 1) {
             char errMessageBuff[kErrMessageBufSize];
             snprintf(errMessageBuff,
@@ -329,14 +330,14 @@ namespace pgenlib {
         const uint32_t writtenVariantCt = plink2::SpgwGetVidx(pGenContext->spgwp);
         const uint32_t droppedVariantCt = static_cast<uint32_t>(numVariantsDropped);
 
-        if ((declaredVariantCt - droppedVariantCt) != writtenVariantCt) {
+        if ((declaredVariantCt != static_cast<long>(pgenlib::kVariantCountUnknown)) && ((declaredVariantCt - droppedVariantCt) != writtenVariantCt)) {
             //TODO: the plink2 python implementation throws on close if you haven't written as many variants as you
             // initially claimed you would, so we do too (after accounting for variants dropped due to exceeding the
             // maximum allele threshold). But, we've come this far - do we REALLY want to throw now ???
             char errMessage[kErrMessageBufSize];
             snprintf(errMessage,
                      kErrMessageBufSize,
-                      "closePgen called with number of variants written (%d) not equal to (declared - dropped)  (%d - %d = %d)",
+                      "closePgen called with number of variants written (%d) not equal to (declared - dropped)  (%d - %d) = %d",
                       writtenVariantCt,
                       declaredVariantCt,
                       droppedVariantCt,
@@ -363,9 +364,19 @@ namespace pgenlib {
         return plink2::SpgwGetVidx(pGenContext->spgwp);
     }
 
-    plink2::PgenWriteMode validatePgenWriteMode(const uint32_t pgenWriteModeInt) {
+    plink2::PgenWriteMode validatePgenWriteMode(const uint32_t pgenWriteModeInt, const long variantCount) {
         switch (pgenWriteModeInt) {
             case 0:
+                if (variantCount == static_cast<long>(pgenlib::kVariantCountUnknown)) {
+                    char errMessageBuff[kErrMessageBufSize];
+                    snprintf(errMessageBuff,
+                             kReservedMessageBufSize,
+                             "pgenWriteMode value (%u) requires a known variant count, and cannot be used with the unknown variant count sentinel value (%d)",
+                             pgenWriteModeInt,
+                             plink2::kPglMaxVariantCt);
+                    throw PgenException(errMessageBuff);
+                }
+                // fall through
             case 1:
             case 2:
                 return static_cast<plink2::PgenWriteMode>(pgenWriteModeInt);

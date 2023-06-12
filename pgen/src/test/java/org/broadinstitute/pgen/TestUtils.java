@@ -70,8 +70,6 @@ public class TestUtils {
            pGenTempPath.toFile().createNewFile();
            pGenTempPath.toFile().deleteOnExit();
 
-           //TODO: also mark the (compressed) .pvar.pzst
-
            return new PgenFileSet(pGenPath, pVarPath, pSamPath, pLogPath);
         }
 
@@ -111,7 +109,8 @@ public class TestUtils {
     // use pgen-jni to convert a VCF to PGEN and return the resulting (temporary) files as a PgenFileSet
     public static PgenFileSet vcfToPgen_jni(
             final Path originalVCF,
-            final PgenWriteMode pgenWriteMode) throws IOException, InterruptedException {
+            final PgenWriteMode pgenWriteMode,
+            final boolean useTrueVariantCount) throws IOException, InterruptedException {
         final PgenFileSet pgenFileSet = PgenFileSet.createTempPgenFileSet("vcfToPgen_jni");
         final VcfMetaData vcfMetaData = getVcfMetaData(originalVCF);
         try(final VCFFileReader reader = new VCFFileReader(originalVCF, false);
@@ -119,7 +118,7 @@ public class TestUtils {
                     new HtsPath(pgenFileSet.pGenPath.toAbsolutePath().toString()),
                     vcfMetaData.vcfHeader,
                     pgenWriteMode,
-                    vcfMetaData.nVariants,
+                    useTrueVariantCount == true ? vcfMetaData.nVariants : PgenWriter.VARIANT_COUNT_UNKNOWN,
                     PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES)) {
             reader.forEach(vc -> writer.add(vc));
         }
@@ -240,6 +239,11 @@ public class TestUtils {
             }
             Assert.assertFalse(jniIt.hasNext());
         }
+    }
+
+    public static void displayPGENSize(final Path pgenFile, final String context) {
+        final long pgenSize = pgenFile.toFile().length();
+        System.out.println(String.format("%-6.6s\t%d", context, pgenSize)); 
     }
 
     //Asserts that the two provided VariantContext objects have equal site/position and concordant genotypes (other attributes are ignored)

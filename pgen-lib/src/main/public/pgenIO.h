@@ -6,6 +6,9 @@
 
 namespace pgenlib {
 
+    // sentinel to use as a variant count to signal that the variant count is unknown
+    const uint32_t kVariantCountUnknown = plink2::kPglMaxVariantCt;
+
     // the public interface to the pgen writer
     PgenContext *openPgen(const char *cFilename, const int pgenWriteModeInt, const long variantCount, const int sampleCount, const int maxAltAlleles);
     void appendAlleles(const PgenContext *const pGenContext, const int32_t* allele_codes, int32_t allele_ct);

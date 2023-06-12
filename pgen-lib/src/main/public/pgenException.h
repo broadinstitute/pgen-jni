@@ -7,7 +7,7 @@
 #include "plink2_base.h"
 
 namespace pgenlib {
-    // reserve some static memory to be used for constructing error messages for exceptions
+    // reserve some memory to be used for constructing error messages for exceptions
     static constexpr int kReservedMessageBufSize = 1024;
     static char reservedForExceptionMessage[kReservedMessageBufSize];
 

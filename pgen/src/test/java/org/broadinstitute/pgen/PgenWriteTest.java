@@ -5,6 +5,7 @@ package org.broadinstitute.pgen;
 
 import htsjdk.io.HtsPath;
 import htsjdk.variant.variantcontext.Allele;
+import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.GenotypeBuilder;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
@@ -20,6 +21,7 @@ import java.nio.BufferOverflowException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 
 public class PgenWriteTest {
@@ -84,26 +86,37 @@ public class PgenWriteTest {
             // "--output-chr" argument in order to make the subsequent VCF comparison to the original succeed. See
             // https://www.cog-genomics.org/plink/2.0/data#irreg_output.
             
-            // small, all bi-allelic, unphased (6 variants/3 samples), test once for each write mode, all without compression
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, "--output-chr M" },
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr M" },
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, "--output-chr M" },
+            // small, all bi-allelic, unphased (6 variants/3 samples), test once for each write mode, and for write mode != PGEN_FILE_MODE_BACKWARD_SEEK,
+            // also test with variant count provided up front or not (PGEN_FILE_MODE_BACKWARD_SEEK always requires an acccurate variant count)
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, true, "--output-chr M" },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr M" },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr M" },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, true, "--output-chr M" },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, false, "--output-chr M" },
 
             // slightly larger, all bi-allelic, phased (600 variants/2504 samples); the genotype concordance validation ignores
             // phasing for now since its not preserved by the pgen writer)
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, "--output-chr M" },
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr M" },
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, "--output-chr M" },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, true, "--output-chr M" },
+
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr M" },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr M" },
+
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, true, "--output-chr M" },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, false, "--output-chr M" },
  
             // larger still, unphased, includes ~6000 multiallelic sites (~117,932 variants/10 samples)
-            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26" },
-            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26" },
+            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26" },
+            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26" },
+            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26" },
+            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26" },
 
-            {  Paths.get("testdata/hg38_trio.pik3ca.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26" },
+            {  Paths.get("testdata/hg38_trio.pik3ca.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26" },
+            {  Paths.get("testdata/hg38_trio.pik3ca.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26" },
             // same as hg38_trio.pik3ca.vcf above, but with the genotypes for the (multi-allelic) variant at 179135392 modified so the last site allele
             // is not referenced by any genotype, and the (multi-allelic) variant at site 179170076 modified so the middle (index 1) allele is not
             // referenced by any genotype; this triggers the issue described https://groups.google.com/g/plink2-users/c/Sn5qVCyDlDw/m/GOWScY6tAQAJ
-            { Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26" }
+            { Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26" },
+            { Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26" }
         };
     }
 
@@ -111,12 +124,24 @@ public class PgenWriteTest {
     public void testRoundTripCompareWithPlink2(
         final Path originalVCF,
         final PgenWriteMode pgenWriteMode,
+        final boolean useTrueVariantCount,
         final String extraPlinkArgs) throws IOException, InterruptedException {
+
+        // the pgenlib api can't handle PGEN_FILE_MODE_BACKWARD_SEEK unless a true variant count is provided, so catch
+        // attempts to test this combination
+        Assert.assertTrue(useTrueVariantCount == true || pgenWriteMode != PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK);
  
         // first, convert the test VCF to pgen twice; once using the PgenWriter and once using plink2 directly
-        final TestUtils.PgenFileSet jniFileSet = TestUtils.vcfToPgen_jni(originalVCF, pgenWriteMode);
+        final TestUtils.PgenFileSet jniFileSet = TestUtils.vcfToPgen_jni(originalVCF, pgenWriteMode, useTrueVariantCount);
         final TestUtils.PgenFileSet plink2FileSet = TestUtils.vcfToPgen_plink2(originalVCF);
 
+        //System.out.println(String.format(
+        //    "%s: mode: %s/%s",
+        //     originalVCF.toString(),
+        //      pgenWriteMode.toString(), useTrueVariantCount == true ? "actual" : "max"));
+        //TestUtils.displayPGENSize(jniFileSet.pGenPath(), "jni");
+        //TestUtils.displayPGENSize(plink2FileSet.pGenPath(), "plink2");
+        
         // now use plink2 to validate both of the generated pgen file sets
         if (pgenWriteMode != PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX) {
             // while we're at it, run plink2 --pgen-diff on the outputs
@@ -140,24 +165,69 @@ public class PgenWriteTest {
         TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, originalVCF, true);
     }
 
-   @Test(expectedExceptions = PgenJniException.class)
-    public void testClosePGENWithNoWrites() throws IOException {
+    // ensure the API rejects attempts to use VARIANT_COUNT_UNKNOWN with PGEN_FILE_MODE_BACKWARD_SEEK file mode
+    @Test(expectedExceptions = PgenJniException.class)
+    public void testSeekWriteModeRequiresKnownVariantCount() throws IOException {
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest");
+        final TestUtils.VcfMetaData vcfMetaData = TestUtils.getVcfMetaData(Paths.get("testdata/CEUtrioTest.vcf"));
+
+        try (final PgenWriter pgenWriter = new PgenWriter(
+                new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
+                vcfMetaData.vcfHeader(),
+                PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK,
+                PgenWriter.VARIANT_COUNT_UNKNOWN,
+                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES))
+        {
+            // do nothing...
+        } catch (final PgenJniException e) {
+            Assert.assertTrue(e.getMessage().contains("requires a known variant count"));
+            throw e;
+        }
+
+    }
+ 
+    @Test(expectedExceptions = PgenJniException.class)
+    public void testNoWritesWithVariantCount() throws IOException {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest");
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 TestUtils.createSingleSampleVCFHeader(),
-                 // use PGEN_FILE_MODE_WRITE_AND_COPY mode here so we don't have to clean up the temp file when we abort artificially
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY,
                 6, // claim we'll write 6 variants, but don't write them
-                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES
-            )) {
-         } catch (final PgenJniException e) {
+                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES))
+        {
+            // do nothing...
+        } catch (final PgenJniException e) {
             Assert.assertTrue(e.getMessage().contains("number of variants written"));
             throw e;
-         }
+        }
     }
 
-    @DataProvider(name="plink2CapabilitiesProvider")
+    // Try to create a writer with VARIANT_COUNT_UNKNOWN (so it will not throw on close if you haven't written enough variants),
+    // and then never write any variants. I would expect this to fail with filemode PGEN_FILE_MODE_BACKWARD_SEEK, since in that
+    // case you're required to provide a variant count up front, and then write that many variants), but this is using write
+    // mode PGEN_FILE_MODE_WRITE_SEPARATE_INDEX.
+    //
+    // Disabled because this triggers an assert:
+    // Assertion failed: (variant_ct), function PwcFinish, file pgenlib_write.cc, line 2284.
+    @Test(enabled = false)
+    public void testNoWritesWithoutVariantCount() throws IOException {
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("writeBufferOverflow");
+        try (final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false);
+             final PgenWriter writer = new PgenWriter(
+                    new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
+                    // use our test header, which has only a single sample (this will cause an artifically small allele_code buffer
+                    // to be allocated, which will then be overflowed when using the variants from the 3-sample test file)
+                    TestUtils.createSingleSampleVCFHeader(),
+                    PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
+                    PgenWriter.VARIANT_COUNT_UNKNOWN,
+                    PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES))
+        {
+            // do nothing
+        }
+     }
+
+   @DataProvider(name="plink2CapabilitiesProvider")
     public Object[][] plink2CapabilitiesProvider() {
         return new Object[][] {
             { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, "--output-chr chr26", true },
@@ -167,7 +237,7 @@ public class PgenWriteTest {
     }
 
     // disabled, since this is not really a pgen-jni test, just a convenient way to see how plink2 handles conversions
-    @Test(dataProvider = "plink2CapabilitiesProvider")
+    @Test(enabled = false, dataProvider = "plink2CapabilitiesProvider")
     public void testPlink2Capabilities(
         final Path originalVCF,
         final PgenWriteMode pgenWriteMode,
@@ -258,7 +328,7 @@ public class PgenWriteTest {
             throw e;
          }
     }
-
+    
     // force our internal allele buffer (the one containing the allele_codes that are passed to plink2) to be overflowed
     @Test(expectedExceptions = RuntimeException.class)
     public void testAlleleBufferOverflow() throws IOException {
@@ -267,19 +337,29 @@ public class PgenWriteTest {
         try (final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false);
              final PgenWriter writer = new PgenWriter(
                     new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
-                    // use our test header, which has only a single sample (this will cause an artifically small allele_code buffer
-                    // to be allocated, which will then be overflowed when using the variants from the 3-sample test file)
-                    TestUtils.createSingleSampleVCFHeader(),
+                    vcfMetaData.vcfHeader(),
                     PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
-                    vcfMetaData.nVariants(),
+                    // use VARIANT_COUNT_UNKNOWN, since otherwise we'll get an exception because we didn't write enough variants
+                    // when the try-with-resources calls close on the writer, which causes suppressed exception issues in the
+                    // catch block
+                    PgenWriter.VARIANT_COUNT_UNKNOWN, 
                     PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES)) {
-            reader.forEach(vc -> writer.add(vc));
+                // first, add one variant that is good (if we close without writing at least one VC successfully, then we'll
+                // get an assert deep down in plink2 code)
+                VariantContext vc = reader.iterator().next();
+                writer.add(vc);
+                // now conjure up a variant that will cause buffer overflow by adding extra genotypes, and write that
+                final VariantContextBuilder vcb = new VariantContextBuilder(vc);
+                final List<Genotype> gts = new ArrayList<>();
+                vc.getGenotypes().stream().forEach(gt -> gts.add(gt));
+                vc.getGenotypes().stream().forEach(gt -> gts.add(gt));
+                writer.add(vcb.genotypes(gts).make()); // throws a buffer overflow exception
         } catch (final RuntimeException e) {
-            // The underlying writer code wraps the BufferOverflowException in a RuntimeException that is
-            // decorated with additional context information. Make sure this RuntimeException is actually caused by a
+            // The underlying writer code wraps the BufferOverflowException in a RuntimeException that is decorated
+            // with additional context information. Make sure this RuntimeException is actually caused by a
             // BufferOverflowException, and then rethrow.
             Assert.assertTrue(e.getCause() instanceof BufferOverflowException);
-            Assert.assertTrue(e.getCause().getMessage().contains("Buffer overflow at position:"));
+            Assert.assertTrue(e.getMessage().contains("Buffer overflow at position:"));
             throw e;
         }
     }

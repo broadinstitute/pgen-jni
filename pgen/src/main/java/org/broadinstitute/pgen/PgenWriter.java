@@ -44,11 +44,18 @@ public class PgenWriter implements VariantContextWriter {
     private static Log logger = Log.getInstance(PgenWriter.class);
 
     /**
-     * 
+     * A sentinel to signal that the number of variants is unknown. This value can be used as a variant count in the
+     * pgen-lib APIs when the variant count is not known up front, as long as the corresponding file mode param is
+     * not PGEN_FILE_MODE_BACKWARD_SEEK (PGEN_FILE_MODE_BACKWARD_SEEK requires an accurate variant count).
+     */
+    public static long VARIANT_COUNT_UNKNOWN = 0x7ffffffd; // plink2::kPglMaxVariantCt
+
+    /**
+     * Sentinel used by plink2 for missing data.
      */
     public static final int PLINK2_NO_CALL_VALUE = -9;
     /**
-     * the maximum number of alternate alleles that plink2/pgen can handle (this is defined by plink2)
+     * The maximum number of alternate alleles that plink2/pgen can handle (this is defined by plink2)
      */
     public static final int PLINK2_MAX_ALTERNATE_ALLELES = 254;  // plink2::kPglMaxAltAlleleCt
 
@@ -163,9 +170,9 @@ public class PgenWriter implements VariantContextWriter {
     @Override
     public void setHeader(final VCFHeader header) {
         throw new UnsupportedOperationException("PGEN writer does not support independent setHeader");
-   }
+    }
 
-   @Override
+    @Override
     public void close() {
         //System.out.println(String.format("Multiallelic: %d NonSNP: %d MNP: %d", multiallelic_ct, nonSNP_ct, mnp_ct));
    
@@ -180,7 +187,7 @@ public class PgenWriter implements VariantContextWriter {
         // writer is opened)
         if (closePgen(pgenContextHandle, droppedVariantCount)) {
             pgenContextHandle = 0;
-            //destroyByteBuffer might returned false if for some reason it has to throw an async Java exception, but
+            //destroyByteBuffer might return false if for some reason it has to throw an async Java exception, but
             // we don't need to test for that here since we're only nulling out a variable on return
             destroyByteBuffer(alleleBuffer);
             alleleBuffer = null;    
