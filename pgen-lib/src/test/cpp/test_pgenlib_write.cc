@@ -171,7 +171,7 @@ BOOST_AUTO_TEST_CASE(test_close_with_too_few_writes) {
             plink2::kPglMaxAltAlleleCt);
     BOOST_REQUIRE_NE(pgenContext, nullptr);
     unlink(tmpFileName);
-    int32_t *allele_codes = new int32_t[3 * 2];
+    int32_t *allele_codes = new int32_t[3 * 2]{0};
     pgenlib::appendAlleles(pgenContext, allele_codes, 2);
     BOOST_REQUIRE_EXCEPTION(
             closePgen(pgenContext, 0),
