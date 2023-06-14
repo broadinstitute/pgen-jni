@@ -6,6 +6,7 @@
 #include <boost/test/data/test_case.hpp>
 #include <boost/array.hpp>
 #include "pgenException.h"
+#include "pgenVariantCountException.h"
 #include "pgenContext.h"
 #include "pgenIO.h"
 #include "pgenUtils.h"
@@ -47,6 +48,7 @@ BOOST_AUTO_TEST_CASE(test_exception_propagation) {
     );
 }
 
+// verify for at least one case that we can sccessfully convert a plink2::pglerr enum into a string
 BOOST_AUTO_TEST_CASE(test_pglerr_string_conversion) {
     const char* const expectedMessage = "kPglRetNotYetSupported";
     BOOST_REQUIRE_EXCEPTION(
@@ -64,7 +66,7 @@ constexpr boost::array<int, 3> s_pgenFileMode {
     PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
     PGEN_FILE_MODE_WRITE_AND_COPY
 };
-BOOST_DATA_TEST_CASE(test_write_unphased_biallelic_small, s_pgenFileMode) {
+BOOST_DATA_TEST_CASE(test_unphased_biallelic_small, s_pgenFileMode) {
     constexpr long n_variants = 6;
     constexpr int n_samples = 3;
     // one variants's worth of allele codes - 2 alleles over 3 samples
@@ -75,6 +77,38 @@ BOOST_DATA_TEST_CASE(test_write_unphased_biallelic_small, s_pgenFileMode) {
     const long file_size = test_write_unphased_pgen(allele_codes, 2,sample, n_variants, n_samples, variantCount);
     // only check for non-zero file size, since the file size varies with the file mode
     BOOST_REQUIRE_NE(file_size, 0);
+    BOOST_REQUIRE_EQUAL(variantCount, n_variants);
+}
+
+// write a larger, bi-allelic pgen, using only file mode PGEN_FILE_MODE_WRITE_AND_COPY
+BOOST_AUTO_TEST_CASE(test_unphased_biallelic_large) {
+    constexpr long n_variants = 100000L;
+    constexpr int n_samples = 10000;
+    constexpr int n_alleles = 2;
+    // one variants's worth of allele codes drawn from 2 alleles
+    int32_t *allele_codes = new int32_t[n_samples * 2];
+    generate_allele_code_distribution(allele_codes, n_samples, n_alleles);
+    long variantCount = 0L;
+    const long file_size = test_write_unphased_pgen(allele_codes, n_alleles,PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount);
+    delete[] allele_codes;
+
+    BOOST_REQUIRE_EQUAL(file_size, 125450028); // cause thats what it is
+    BOOST_REQUIRE_EQUAL(variantCount, n_variants);
+}
+
+// write a larger, multi-allelic pgen, using only file mode PGEN_FILE_MODE_WRITE_AND_COPY
+BOOST_AUTO_TEST_CASE(test_unphased_multi_allelic_large) {
+    constexpr long n_variants = 100000L;
+    constexpr int n_samples = 10000;
+    constexpr int n_alleles = 7;
+    // synthesize one variants's worth of allele codes, with genotypes randomly drawn from 7 allele codes
+    int32_t *allele_codes = new int32_t[n_samples * 2];
+    generate_allele_code_distribution(allele_codes, n_samples, n_alleles);
+    long variantCount = 0L;
+    const long file_size = test_write_unphased_pgen(allele_codes, n_alleles,PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount);
+    delete[] allele_codes;
+
+    BOOST_REQUIRE_EQUAL(file_size, 911252530); // cause thats what it is
     BOOST_REQUIRE_EQUAL(variantCount, n_variants);
 }
 
@@ -102,39 +136,7 @@ BOOST_AUTO_TEST_CASE(test_multiallelic_some_alleles_not_observed) {
     test_write_unphased_pgen(allele_codes, n_alleles, PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount);
 }
 
-// write a larger, bi-allelic pgen, using only file mode PGEN_FILE_MODE_WRITE_AND_COPY
-BOOST_AUTO_TEST_CASE(test_write_unphased_biallelic_large) {
-    constexpr long n_variants = 100000L;
-    constexpr int n_samples = 10000;
-    constexpr int n_alleles = 2;
-    // one variants's worth of allele codes drawn from 2 alleles
-    int32_t *allele_codes = new int32_t[n_samples * 2];
-    generate_allele_code_distribution(allele_codes, n_samples, n_alleles);
-    long variantCount = 0L;
-    const long file_size = test_write_unphased_pgen(allele_codes, n_alleles,PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount);
-    delete[] allele_codes;
-
-    BOOST_REQUIRE_EQUAL(file_size, 125450028); // cause thats what it is
-    BOOST_REQUIRE_EQUAL(variantCount, n_variants);
-}
-
-// write a larger, bi-allelic pgen, using only file mode PGEN_FILE_MODE_WRITE_AND_COPY
-BOOST_AUTO_TEST_CASE(test_write_unphased_multi_allelic_large) {
-    constexpr long n_variants = 100000L;
-    constexpr int n_samples = 10000;
-    constexpr int n_alleles = 7;
-    // synthesize one variants's worth of allele codes, with genotypes randomly drawn from 7 allele codes
-    int32_t *allele_codes = new int32_t[n_samples * 2];
-    generate_allele_code_distribution(allele_codes, n_samples, n_alleles);
-    long variantCount = 0L;
-    const long file_size = test_write_unphased_pgen(allele_codes, n_alleles,PGEN_FILE_MODE_WRITE_AND_COPY, n_variants, n_samples, variantCount);
-    delete[] allele_codes;
-
-    BOOST_REQUIRE_EQUAL(file_size, 911252530); // cause thats what it is
-    BOOST_REQUIRE_EQUAL(variantCount, n_variants);
-}
-
-// claim that we're going to write 10 variants, but then don't write them
+// claim that we're going to write 10 variants, but don't write any)
 BOOST_AUTO_TEST_CASE(test_close_with_no_writes) {
     const char* const expectedNoWriteMessage = "closePgen called with number of variants written";
     char tmpFileName[TMP_FILENAME_SIZE];
@@ -149,14 +151,38 @@ BOOST_AUTO_TEST_CASE(test_close_with_no_writes) {
     unlink(tmpFileName);
     BOOST_REQUIRE_EXCEPTION(
             closePgen(pgenContext, 0),
-            PgenException,
-            [expectedNoWriteMessage](PgenException ex) -> bool  {
+            PgenVariantCountException,
+            [expectedNoWriteMessage](PgenVariantCountException ex) -> bool  {
                 return strstr(ex.what(), expectedNoWriteMessage);
             }
     );
 }
 
-BOOST_AUTO_TEST_CASE(test_invalid_allele_code) {
+// claim that we're going to write 10 variants, but only write 1
+BOOST_AUTO_TEST_CASE(test_close_with_too_few_writes) {
+    const char* const expectedNoWriteMessage = "closePgen called with number of variants written";
+    char tmpFileName[TMP_FILENAME_SIZE];
+    createTempFile("test_write.pgen", tmpFileName);
+    const pgenlib::PgenContext *const pgenContext = pgenlib::openPgen(
+            tmpFileName,
+            PGEN_FILE_MODE_WRITE_AND_COPY,
+            10L,
+            3,
+            plink2::kPglMaxAltAlleleCt);
+    BOOST_REQUIRE_NE(pgenContext, nullptr);
+    unlink(tmpFileName);
+    int32_t *allele_codes = new int32_t[3 * 2];
+    pgenlib::appendAlleles(pgenContext, allele_codes, 2);
+    BOOST_REQUIRE_EXCEPTION(
+            closePgen(pgenContext, 0),
+            PgenVariantCountException,
+            [expectedNoWriteMessage](PgenVariantCountException ex) -> bool  {
+                return strstr(ex.what(), expectedNoWriteMessage);
+            }
+    );
+}
+
+BOOST_AUTO_TEST_CASE(test_reject_invalid_allele_code) {
     constexpr long n_variants = 6;
     constexpr int n_samples = 3;
     // one variants's worth of allele codes - 2 alleles over 3 samples, with on bad allele code
@@ -173,7 +199,7 @@ BOOST_AUTO_TEST_CASE(test_invalid_allele_code) {
 }
 
 // use a bogus pgen write mode
-BOOST_AUTO_TEST_CASE(test_undefined_write_mode) {
+BOOST_AUTO_TEST_CASE(test_reject_invalid_write_mode) {
     const char* const expectedInvalidModeMessage = "Invalid pgenWriteMode";
     char tmpFileName[TMP_FILENAME_SIZE];
     createTempFile("test_write.pgen", tmpFileName);
@@ -188,22 +214,7 @@ BOOST_AUTO_TEST_CASE(test_undefined_write_mode) {
     );
 }
 
-// use pgen write mode 0 (seek) with an unknown variant count
-BOOST_AUTO_TEST_CASE(test_seek_write_mode_requires_known_variant_count) {
-    const char* const expectedInvalidModeMessage = "requires a known variant count";
-    char tmpFileName[TMP_FILENAME_SIZE];
-    createTempFile("test_write.pgen", tmpFileName);
-    unlink(tmpFileName);
-    BOOST_REQUIRE_EXCEPTION(
-            pgenlib::openPgen(tmpFileName, PGEN_FILE_MODE_BACKWARD_SEEK, static_cast<long>(plink2::kPglMaxVariantCt), 3, plink2::kPglMaxAltAlleleCt),
-            PgenException,
-            [expectedInvalidModeMessage](PgenException ex) -> bool  {
-                return strstr(ex.what(), expectedInvalidModeMessage);
-            }
-    );
-}
-
-BOOST_AUTO_TEST_CASE(test_invalid_sample_count) {
+BOOST_AUTO_TEST_CASE(test_reject_invalid_sample_count) {
     const char* const expectedInvalidSampleCountMessage = "Invalid sample count";
     char tmpFileName[TMP_FILENAME_SIZE];
     createTempFile("test_write.pgen", tmpFileName);
@@ -218,7 +229,7 @@ BOOST_AUTO_TEST_CASE(test_invalid_sample_count) {
     );
 }
 
-BOOST_AUTO_TEST_CASE(test_invalid_variant_count) {
+BOOST_AUTO_TEST_CASE(test_reject_invalid_variant_count) {
     const char* const expectedInvalidVariantCountMessage = "Invalid variant count";
     char tmpFileName[TMP_FILENAME_SIZE];
     createTempFile("test_write.pgen", tmpFileName);
@@ -229,6 +240,25 @@ BOOST_AUTO_TEST_CASE(test_invalid_variant_count) {
             PgenException,
             [expectedInvalidVariantCountMessage](PgenException ex) -> bool  {
                 return strstr(ex.what(), expectedInvalidVariantCountMessage);
+            }
+    );
+}
+
+// use pgen write mode 0 (seek) with an unknown variant count
+BOOST_AUTO_TEST_CASE(test_reject_seek_write_mode_with_unknown_variant_count) {
+    const char* const expectedInvalidModeMessage = "requires a known variant count";
+    char tmpFileName[TMP_FILENAME_SIZE];
+    createTempFile("test_write.pgen", tmpFileName);
+    unlink(tmpFileName);
+    BOOST_REQUIRE_EXCEPTION(
+            pgenlib::openPgen(tmpFileName,
+                              PGEN_FILE_MODE_BACKWARD_SEEK,
+                              static_cast<long>(plink2::kPglMaxVariantCt),
+                              3,
+                              plink2::kPglMaxAltAlleleCt),
+            PgenException,
+            [expectedInvalidModeMessage](PgenException ex) -> bool  {
+                return strstr(ex.what(), expectedInvalidModeMessage);
             }
     );
 }

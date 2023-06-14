@@ -7,14 +7,14 @@ using namespace std;
 // Throw a Java exception (PgenJniException) with the given error message. Note that control RETURNS
 // to the caller after the exception is thrown.
 //
-bool throwAsyncJavaException( JNIEnv* env, const char* message ) {
-    jclass exceptionClass = env->FindClass("org/broadinstitute/pgen/PgenJniException");
+bool throwAsyncJavaException( JNIEnv* env, const char* message, const char *javaExceptionClassName ) {
+    jclass exceptionClass = env->FindClass(javaExceptionClassName);
     bool result = false;
 
     if ( exceptionClass ) {
         jint throwResult = env->ThrowNew(exceptionClass, message);
         if (throwResult < 0) {
-            std::cerr << "Failure throwing Java exception from native code while handling underlying exception caused by: " << message;
+            std::cerr << "Failure throwing Java exception while handling an underlying exception caused by: " << message;
         } else {
             result = true;
         }
@@ -30,5 +30,7 @@ bool reThrowAsAsyncJavaException( JNIEnv* env, const PgenException& pgenExceptio
     static constexpr int kReservedMessageBufSize = 1024;
     static char reservedForExceptionMessage[kReservedMessageBufSize];
     snprintf(reservedForExceptionMessage, kReservedMessageBufSize, "%s / %s", pgenException.what(), context);
-    return throwAsyncJavaException(env, pgenException.what());
+    return throwAsyncJavaException(env, reservedForExceptionMessage, "org/broadinstitute/pgen/PgenJniException");
 }
+
+        

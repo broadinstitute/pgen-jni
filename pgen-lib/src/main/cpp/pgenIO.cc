@@ -1,9 +1,8 @@
 #include <cmath>
 
-using namespace std;
-
 #include "pgenContext.h"
 #include "pgenException.h"
+#include "pgenVariantCountException.h"
 #include "pgenUtils.h"
 #include "pgenIO.h"
 #include "pgenlib_misc.h"
@@ -330,10 +329,12 @@ namespace pgenlib {
         const uint32_t writtenVariantCt = plink2::SpgwGetVidx(pGenContext->spgwp);
         const uint32_t droppedVariantCt = static_cast<uint32_t>(numVariantsDropped);
 
-        if ((declaredVariantCt != static_cast<long>(pgenlib::kVariantCountUnknown)) && ((declaredVariantCt - droppedVariantCt) != writtenVariantCt)) {
-            //TODO: the plink2 python implementation throws on close if you haven't written as many variants as you
-            // initially claimed you would, so we do too (after accounting for variants dropped due to exceeding the
-            // maximum allele threshold). But, we've come this far - do we REALLY want to throw now ???
+        if ((declaredVariantCt != static_cast<long>(pgenlib::kVariantCountUnknown)) &&
+            ((declaredVariantCt - droppedVariantCt) != writtenVariantCt)) {
+            // the plink2 python implementation of the pgen writer throws on close if you haven't written as many
+            // variants as you initially claimed you would (at least in the case where the variant count is known
+            // up front), so we do the same here (after accounting for variants dropped due to exceeding the
+            // maximum allele threshold).
             char errMessage[kErrMessageBufSize];
             snprintf(errMessage,
                      kErrMessageBufSize,
@@ -342,18 +343,26 @@ namespace pgenlib {
                       declaredVariantCt,
                       droppedVariantCt,
                       declaredVariantCt - droppedVariantCt);
-            throw PgenException(errMessage);
-        }
+            // throw a C++ exception that is specific to this (variant count) failure, so the Java code for the
+            // writer can catch and handle that case without propagating it, because throwing from the Closeable
+            // "close" method, when the writer is created within a try-with-resources statement can mask other
+            // exceptions
+            throw PgenVariantCountException(errMessage);
+        } else if (writtenVariantCt != 0) {
+            // guard against calling the plink2 finish/cleanup methods in the case where no writes have been made
+            // because doing so triggers asserts in the plink code, presumably because downstream code paths can't
+            // handle it:
+            // Assertion failed: (variant_ct), function PwcFinish, file pgenlib_write.cc, line 2284.
+            throwOnPglErr(SpgwFinish(pGenContext->spgwp), "Error closing pgen file: SpgwFinish");
 
-        throwOnPglErr(SpgwFinish(pGenContext->spgwp), "Error closing pgen file: SpgwFinish");
-
-        //TODO: there might be a bug in plink pgen-lib, since I think the plink2 VCF importer only does one or the
-        // other of SpgwFinish and CleanupSpgw (SpgwFinish on success, CleanupSpgw on failure), but not both. but
-        // if we don't do both, the output doesn't seem to get flushed...
-        plink2::PglErr cleanupErr;
-        plink2::BoolErr bErr = CleanupSpgw(pGenContext->spgwp, &cleanupErr);
-        if (bErr) {
-            throwOnPglErr(cleanupErr, "Error cleaning up on pgen close: CleanupSpgw");
+            // there may be a bug in plink2 pgen-lib, since I think the plink2 VCF importer only does one or the
+            // other of SpgwFinish and CleanupSpgw (SpgwFinish on success, CleanupSpgw on failure), but not both.
+            // But if we don't do both here, the output doesn't seem to get flushed until the process exits.
+            plink2::PglErr cleanupErr;
+            plink2::BoolErr bErr = CleanupSpgw(pGenContext->spgwp, &cleanupErr);
+            if (bErr) {
+                throwOnPglErr(cleanupErr, "Error cleaning up on pgen close: CleanupSpgw");
+            }
         }
         free(pGenContext->spgwp);
         plink2::aligned_free(pGenContext->spgw_alloc);

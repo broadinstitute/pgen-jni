@@ -165,10 +165,11 @@ public class PgenWriteTest {
         TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, originalVCF, true);
     }
 
-    // ensure the API rejects attempts to use VARIANT_COUNT_UNKNOWN with PGEN_FILE_MODE_BACKWARD_SEEK file mode
+    // ensure the PgenWriter constructor rejects attempts to use VARIANT_COUNT_UNKNOWN with PGEN_FILE_MODE_BACKWARD_SEEK file mode,
+    // since its forbidden by plink2
     @Test(expectedExceptions = PgenJniException.class)
-    public void testSeekWriteModeRequiresKnownVariantCount() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest");
+    public void testSeekWriteModeRejectsUnknownVariantCount() throws IOException {
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testSeekWriteModeRejectsUnknownVariantCount");
         final TestUtils.VcfMetaData vcfMetaData = TestUtils.getVcfMetaData(Paths.get("testdata/CEUtrioTest.vcf"));
 
         try (final PgenWriter pgenWriter = new PgenWriter(
@@ -183,12 +184,15 @@ public class PgenWriteTest {
             Assert.assertTrue(e.getMessage().contains("requires a known variant count"));
             throw e;
         }
-
     }
  
-    @Test(expectedExceptions = PgenJniException.class)
-    public void testNoWritesWithVariantCount() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("noWritesPgenTest");
+    @Test
+    public void testNoWritesWithKnownVariantCount() throws IOException {
+        // this test is basically to ensure that the pgen-lib C++ code correctly handles closing in the case where
+        // the variant count is known, but 0 variants are written (the plink2 code seems to handle it ok if too few
+        // variants are written, but not if 0 variants are written, so this tests that pgen-lib specifically handles
+        // that case
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testNoWritesWithKnownVariantCount");
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 TestUtils.createSingleSampleVCFHeader(),
@@ -197,27 +201,40 @@ public class PgenWriteTest {
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES))
         {
             // do nothing...
-        } catch (final PgenJniException e) {
-            Assert.assertTrue(e.getMessage().contains("number of variants written"));
-            throw e;
+            Assert.assertEquals(pgenWriter.getDroppedVariantCount(), 0L);
+            Assert.assertEquals(pgenWriter.getWrittenVariantCount(), 0L);
         }
     }
 
-    // Try to create a writer with VARIANT_COUNT_UNKNOWN (so it will not throw on close if you haven't written enough variants),
-    // and then never write any variants. I would expect this to fail with filemode PGEN_FILE_MODE_BACKWARD_SEEK, since in that
-    // case you're required to provide a variant count up front, and then write that many variants), but this is using write
-    // mode PGEN_FILE_MODE_WRITE_SEPARATE_INDEX.
-    //
-    // Disabled because this triggers an assert down in plink2:
-    // Assertion failed: (variant_ct), function PwcFinish, file pgenlib_write.cc, line 2284.
-    @Test(enabled = false)
-    public void testNoWritesWithoutVariantCount() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("writeBufferOverflow");
+    @Test
+    public void testTooFewWritesWithKnownVariantCount() throws IOException {
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testTooFewWritesWithKnownVariantCount");
+        final TestUtils.VcfMetaData vcfMetaData = TestUtils.getVcfMetaData(Paths.get("testdata/CEUtrioTest.vcf"));
+        try (final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false);
+             final PgenWriter pgenWriter = new PgenWriter(
+                new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
+                vcfMetaData.vcfHeader(),
+                PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY,
+                vcfMetaData.nVariants(),
+                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES))
+        {
+            // write 1 variant, then bail
+            pgenWriter.add(reader.iterator().next());
+            Assert.assertEquals(pgenWriter.getDroppedVariantCount(), 0L);
+            Assert.assertEquals(pgenWriter.getWrittenVariantCount(), 1L);
+        }
+    }
+
+    // Create a writer with VARIANT_COUNT_UNKNOWN (so it will not throw on close if you haven't written enough variants),
+    // and then never write any variants. This should succeed with file mode PGEN_FILE_MODE_WRITE_SEPARATE_INDEX (it will
+    // fail with filemode PGEN_FILE_MODE_BACKWARD_SEEK, since in that case you're required to provide a variant count up
+    // front, and then write that many variants).
+    @Test
+    public void testNoWritesWithUnknownVariantCount() throws IOException {
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testNoWritesWithUnknownVariantCount");
         try (final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false);
              final PgenWriter writer = new PgenWriter(
                     new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
-                    // use our test header, which has only a single sample (this will cause an artifically small allele_code buffer
-                    // to be allocated, which will then be overflowed when using the variants from the 3-sample test file)
                     TestUtils.createSingleSampleVCFHeader(),
                     PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
                     PgenWriter.VARIANT_COUNT_UNKNOWN,
@@ -261,23 +278,38 @@ public class PgenWriteTest {
     @Test(expectedExceptions = PgenJniException.class)
     public void testRejectNonDiploid() throws IOException {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("rejectNonDiploid");
-        try (final PgenWriter pgenWriter = new PgenWriter(
+        final List<Allele> alleles = List.of(Allele.REF_A, Allele.ALT_C, Allele.ALT_G);
+        final VariantContextBuilder vcb = new VariantContextBuilder("test", "chr1", 1, 1, alleles);
+        final VariantContext ploidy3VC = vcb.genotypes(
+            List.of(new GenotypeBuilder().name("s1").alleles(alleles).make())
+        ).make();
+        Assert.assertEquals(ploidy3VC.getMaxPloidy(2), 3);
+
+        // For reasons unknown, putting the PgenWriter constructor inside the try-with-resources results
+        // in an IllegalArgumentException, due to an illegal attempt to self-suppress an exception
+        // (somewhere code is trying to add this exception to it's own suppressed exception list), but only
+        // when runnning inside VS Code. This does not happen when gradle runs the test, but keep it
+        // outside.
+        PgenWriter pgenWriter =  null;
+        try {
+            pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 TestUtils.createSingleSampleVCFHeader(),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
-                6,
-                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES)) {
-            final List<Allele> alleles = List.of(Allele.REF_A, Allele.ALT_C, Allele.ALT_G);
-            final VariantContextBuilder vcb = new VariantContextBuilder("test", "chr1", 1, 1, alleles);
-            final VariantContext ploidy3VC = vcb.genotypes(
-                List.of(new GenotypeBuilder().name("s1").alleles(alleles).make())
-            ).make();
-            Assert.assertEquals(ploidy3VC.getMaxPloidy(2), 3);
+                PgenWriter.VARIANT_COUNT_UNKNOWN,
+                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES);
+        } catch (final PgenJniException e) {
+            // we expect a PgenJniException in this test, but not from the constructor, so make sure we don't
+            // inadvertently succeed because of some nefarious failure in the constructor
+            Assert.fail("should never reach here");
+        }
+        try {
             pgenWriter.add(ploidy3VC);
-         } catch (final PgenJniException e) {
+        } catch (final PgenJniException e) {
             Assert.assertTrue(e.getMessage().contains("ploidy = 3"));
+            pgenWriter.close();
             throw e;
-         }
+        }
     }
 
     // verify that we really do drop variants that exceed the maximum alterate allele threshold
@@ -315,7 +347,7 @@ public class PgenWriteTest {
     // verify that we reject attempts to set a max alternate allele threshold that exceeds plink2 maximum
     @Test(expectedExceptions = PgenJniException.class)
     public void testRejectRequestedMaxAltAllelesExceedsPlinkMax() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("maxAltAlelesTest");
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testRejectRequestedMaxAltAllelesExceedsPlinkMax");
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 TestUtils.createSingleSampleVCFHeader(),
@@ -339,21 +371,21 @@ public class PgenWriteTest {
                     new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                     vcfMetaData.vcfHeader(),
                     PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
-                    // use VARIANT_COUNT_UNKNOWN, since otherwise we'll get an exception because we didn't write enough variants
-                    // when the try-with-resources calls close on the writer, which causes suppressed exception issues in the
-                    // catch block
+                    // use VARIANT_COUNT_UNKNOWN, since otherwise we'll get an exception because we didn't write
+                    // enough variants when the try-with-resources calls close on the writer
                     PgenWriter.VARIANT_COUNT_UNKNOWN, 
                     PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES)) {
-                // first, add one variant that is good (if we close without writing at least one VC successfully, then we'll
-                // get an assert deep down in plink2 code)
+                // first, add one good variant
                 VariantContext vc = reader.iterator().next();
                 writer.add(vc);
-                // now conjure up a variant that will cause buffer overflow by adding extra genotypes, and write that
+
+                // now conjure and write up a bad variant that will cause buffer overflow due to having too many genotypes
                 final VariantContextBuilder vcb = new VariantContextBuilder(vc);
                 final List<Genotype> gts = new ArrayList<>();
                 vc.getGenotypes().stream().forEach(gt -> gts.add(gt));
                 vc.getGenotypes().stream().forEach(gt -> gts.add(gt));
-                writer.add(vcb.genotypes(gts).make()); // throws a buffer overflow exception
+
+                writer.add(vcb.genotypes(gts).make()); // throws a runtime exeption due to buffer overflow exception
         } catch (final RuntimeException e) {
             // The underlying writer code wraps the BufferOverflowException in a RuntimeException that is decorated
             // with additional context information. Make sure this RuntimeException is actually caused by a

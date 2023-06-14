@@ -16,6 +16,7 @@ add_executable(pgen_lib
         src/main/public/pgenIO.h
         src/main/public/pgenContext.h
         src/main/public/pgenException.h
+        src/main/public/pgenVariantCountException.h
         src/main/public/pgenUtils.h
 
         # implementation of the C++ public API (callable by the JNI layer)

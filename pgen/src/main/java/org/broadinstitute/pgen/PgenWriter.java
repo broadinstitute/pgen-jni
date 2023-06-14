@@ -118,9 +118,8 @@ public class PgenWriter implements VariantContextWriter {
      * 
      * Supports only diploid sites with fewer than {@code PLINK2_MAX_ALTERNATE_ALLELES} (this value can be
      * furhter limited using {@code maxAltAlleles}. Sites that exceed this number are silently dropped.
-     * limit are silently dropped).
      * 
-     * NOTE: Currently this wrier doesn't preserve genotype phasing.
+     * NOTE: Currently this writer doesn't preserve genotype phasing.
      */
     public PgenWriter(
         final HtsPath pgenFile,
@@ -138,7 +137,7 @@ public class PgenWriter implements VariantContextWriter {
         }
         if (maxAltAlleles > PLINK2_MAX_ALTERNATE_ALLELES) {
             throw new PgenJniException(
-                String.format("Requested max alternate alleles of (%d) exceeds the supported pgen max of %d",
+                String.format("Requested max alternate alleles of (%d) exceeds the supported pgen max of (%d)",
                     maxAltAlleles,
                     PLINK2_MAX_ALTERNATE_ALLELES));
         }
@@ -185,13 +184,13 @@ public class PgenWriter implements VariantContextWriter {
         // Tell the writer how many variants we dropped (due to exceeding the # of alternate alleles) so it
         // doesn't throw if the number written doesn't match the number expected (which is provided when the
         // writer is opened)
-        if (closePgen(pgenContextHandle, droppedVariantCount)) {
+       if (closePgen(pgenContextHandle, droppedVariantCount)) {
             pgenContextHandle = 0;
             //destroyByteBuffer might return false if for some reason it has to throw an async Java exception, but
             // we don't need to test for that here since we're only nulling out a variable on return
             destroyByteBuffer(alleleBuffer);
             alleleBuffer = null;    
-        }
+       }
     }
 
     @Override

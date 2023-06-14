@@ -9,7 +9,7 @@ using namespace pgenlib;
 // Throw a Java exception (PgenJniException) with the given error message. Note that control RETURNS
 // to the caller after the exception is thrown.
 //
-bool throwAsyncJavaException( JNIEnv* env, const char* message );
+bool throwAsyncJavaException( JNIEnv* env, const char* message, const char *javaExceptionClassName );
 
 // Re-throw a PgenException (that originated in underlying *PGENLIB* code) as a Java exception.
 //  Note that control RETURNS to the caller after the exception is thrown.
