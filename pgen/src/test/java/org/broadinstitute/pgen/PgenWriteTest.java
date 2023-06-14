@@ -27,7 +27,7 @@ import java.util.List;
 public class PgenWriteTest {
 
     @SuppressWarnings("unused")
-    @Test(expectedExceptions = PgenJniException.class)
+    @Test(expectedExceptions = PgenException.class)
     public void testExceptionPropagation() throws IOException {
         final PgenFileSet pgenFileSet = PgenFileSet.createTempPgenFileSet("pgenReadOnly");
         pgenFileSet.pGenPath().toFile().setReadOnly();
@@ -39,7 +39,7 @@ public class PgenWriteTest {
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
                 6,
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES);
-        } catch (final PgenJniException e) {
+        } catch (final PgenException e) {
             Assert.assertNotNull(e.getMessage().contains("kPglRetOpenFail"));
             throw e;
         }
@@ -167,7 +167,7 @@ public class PgenWriteTest {
 
     // ensure the PgenWriter constructor rejects attempts to use VARIANT_COUNT_UNKNOWN with PGEN_FILE_MODE_BACKWARD_SEEK file mode,
     // since its forbidden by plink2
-    @Test(expectedExceptions = PgenJniException.class)
+    @Test(expectedExceptions = PgenException.class)
     public void testSeekWriteModeRejectsUnknownVariantCount() throws IOException {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testSeekWriteModeRejectsUnknownVariantCount");
         final TestUtils.VcfMetaData vcfMetaData = TestUtils.getVcfMetaData(Paths.get("testdata/CEUtrioTest.vcf"));
@@ -180,7 +180,7 @@ public class PgenWriteTest {
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES))
         {
             // do nothing...
-        } catch (final PgenJniException e) {
+        } catch (final PgenException e) {
             Assert.assertTrue(e.getMessage().contains("requires a known variant count"));
             throw e;
         }
@@ -229,16 +229,16 @@ public class PgenWriteTest {
     // and then never write any variants. This should succeed with file mode PGEN_FILE_MODE_WRITE_SEPARATE_INDEX (it will
     // fail with filemode PGEN_FILE_MODE_BACKWARD_SEEK, since in that case you're required to provide a variant count up
     // front, and then write that many variants).
-    @Test
+    @Test(expectedExceptions=PgenEmptyPgenException.class)
     public void testNoWritesWithUnknownVariantCount() throws IOException {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testNoWritesWithUnknownVariantCount");
-        try (final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false);
-             final PgenWriter writer = new PgenWriter(
+        try (final PgenWriter writer = new PgenWriter(
                     new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                     TestUtils.createSingleSampleVCFHeader(),
                     PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
                     PgenWriter.VARIANT_COUNT_UNKNOWN,
-                    PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES))
+                    PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES);
+            final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false))
         {
             // do nothing
         }
@@ -275,7 +275,7 @@ public class PgenWriteTest {
     }
 
     // reject non-diploid variants
-    @Test(expectedExceptions = PgenJniException.class)
+    @Test(expectedExceptions = PgenException.class)
     public void testRejectNonDiploid() throws IOException {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("rejectNonDiploid");
         final List<Allele> alleles = List.of(Allele.REF_A, Allele.ALT_C, Allele.ALT_G);
@@ -298,17 +298,22 @@ public class PgenWriteTest {
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
                 PgenWriter.VARIANT_COUNT_UNKNOWN,
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES);
-        } catch (final PgenJniException e) {
-            // we expect a PgenJniException in this test, but not from the constructor, so make sure we don't
+        } catch (final PgenException e) {
+            // we expect a PgenException in this test, but not from the constructor, so make sure we don't
             // inadvertently succeed because of some nefarious failure in the constructor
             Assert.fail("should never reach here");
         }
         try {
             pgenWriter.add(ploidy3VC);
-        } catch (final PgenJniException e) {
-            Assert.assertTrue(e.getMessage().contains("ploidy = 3"));
-            pgenWriter.close();
-            throw e;
+        } catch (final PgenException ploidyException) {
+            Assert.assertTrue(ploidyException.getMessage().contains("ploidy = 3"));
+            try {
+                pgenWriter.close();
+            } catch (final PgenEmptyPgenException emptyPgenException) {
+                // this is expected because the ploidy exception is thrown on the very first variantwe try to
+                // add, so no variants ever get written
+            }
+            throw ploidyException;
         }
     }
 
@@ -345,7 +350,7 @@ public class PgenWriteTest {
     }
 
     // verify that we reject attempts to set a max alternate allele threshold that exceeds plink2 maximum
-    @Test(expectedExceptions = PgenJniException.class)
+    @Test(expectedExceptions = PgenException.class)
     public void testRejectRequestedMaxAltAllelesExceedsPlinkMax() throws IOException {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testRejectRequestedMaxAltAllelesExceedsPlinkMax");
         try (final PgenWriter pgenWriter = new PgenWriter(
@@ -355,7 +360,7 @@ public class PgenWriteTest {
                 6,
                 // add one to plink's max to be certain we exceed the limit
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES + 1)) {
-         } catch (final PgenJniException e) {
+         } catch (final PgenException e) {
             Assert.assertTrue(e.getMessage().contains("exceeds the supported pgen max"));
             throw e;
          }

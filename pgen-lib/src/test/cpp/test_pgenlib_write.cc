@@ -6,7 +6,8 @@
 #include <boost/test/data/test_case.hpp>
 #include <boost/array.hpp>
 #include "pgenException.h"
-#include "pgenVariantCountException.h"
+#include "pgenMissingVariantsException.h"
+#include "pgenEmptyPgenException.h"
 #include "pgenContext.h"
 #include "pgenIO.h"
 #include "pgenUtils.h"
@@ -137,7 +138,7 @@ BOOST_AUTO_TEST_CASE(test_multiallelic_some_alleles_not_observed) {
 }
 
 // claim that we're going to write 10 variants, but don't write any)
-BOOST_AUTO_TEST_CASE(test_close_with_no_writes) {
+BOOST_AUTO_TEST_CASE(test_close_no_writes_known_variant_count) {
     const char* const expectedNoWriteMessage = "closePgen called with number of variants written";
     char tmpFileName[TMP_FILENAME_SIZE];
     createTempFile("test_write.pgen", tmpFileName);
@@ -151,15 +152,37 @@ BOOST_AUTO_TEST_CASE(test_close_with_no_writes) {
     unlink(tmpFileName);
     BOOST_REQUIRE_EXCEPTION(
             closePgen(pgenContext, 0),
-            PgenVariantCountException,
-            [expectedNoWriteMessage](PgenVariantCountException ex) -> bool  {
+            PgenMissingVariantsException,
+            [expectedNoWriteMessage](PgenMissingVariantsException ex) -> bool  {
+                return strstr(ex.what(), expectedNoWriteMessage);
+            }
+    );
+}
+
+// unknown variant count, don't write any)
+BOOST_AUTO_TEST_CASE(test_close_no_writes_unknown_variant_count) {
+    const char* const expectedNoWriteMessage = "An empty PGEN is not valid";
+    char tmpFileName[TMP_FILENAME_SIZE];
+    createTempFile("test_write.pgen", tmpFileName);
+    const pgenlib::PgenContext *const pgenContext = pgenlib::openPgen(
+            tmpFileName,
+            PGEN_FILE_MODE_WRITE_AND_COPY,
+            static_cast<long>(plink2::kPglMaxVariantCt),
+            3,
+            plink2::kPglMaxAltAlleleCt);
+    BOOST_REQUIRE_NE(pgenContext, nullptr);
+    unlink(tmpFileName);
+    BOOST_REQUIRE_EXCEPTION(
+            closePgen(pgenContext, 0),
+            PgenEmptyPgenException,
+            [expectedNoWriteMessage](PgenEmptyPgenException ex) -> bool  {
                 return strstr(ex.what(), expectedNoWriteMessage);
             }
     );
 }
 
 // claim that we're going to write 10 variants, but only write 1
-BOOST_AUTO_TEST_CASE(test_close_with_too_few_writes) {
+BOOST_AUTO_TEST_CASE(test_close_too_few_writes_known_variant_count) {
     const char* const expectedNoWriteMessage = "closePgen called with number of variants written";
     char tmpFileName[TMP_FILENAME_SIZE];
     createTempFile("test_write.pgen", tmpFileName);
@@ -175,11 +198,28 @@ BOOST_AUTO_TEST_CASE(test_close_with_too_few_writes) {
     pgenlib::appendAlleles(pgenContext, allele_codes, 2);
     BOOST_REQUIRE_EXCEPTION(
             closePgen(pgenContext, 0),
-            PgenVariantCountException,
-            [expectedNoWriteMessage](PgenVariantCountException ex) -> bool  {
+            PgenMissingVariantsException,
+            [expectedNoWriteMessage](PgenMissingVariantsException ex) -> bool  {
                 return strstr(ex.what(), expectedNoWriteMessage);
             }
     );
+}
+
+// claim that we're going to write 10 variants, but only write 1
+BOOST_AUTO_TEST_CASE(test_close_too_few_writes_unknown_variant_count) {
+    char tmpFileName[TMP_FILENAME_SIZE];
+    createTempFile("test_write.pgen", tmpFileName);
+    const pgenlib::PgenContext *const pgenContext = pgenlib::openPgen(
+            tmpFileName,
+            PGEN_FILE_MODE_WRITE_AND_COPY,
+            static_cast<long>(plink2::kPglMaxVariantCt),
+            3,
+            plink2::kPglMaxAltAlleleCt);
+    BOOST_REQUIRE_NE(pgenContext, nullptr);
+    unlink(tmpFileName);
+    int32_t *allele_codes = new int32_t[3 * 2]{0};
+    pgenlib::appendAlleles(pgenContext, allele_codes, 2);
+    closePgen(pgenContext, 0);
 }
 
 BOOST_AUTO_TEST_CASE(test_reject_invalid_allele_code) {

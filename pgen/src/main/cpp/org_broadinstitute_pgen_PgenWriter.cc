@@ -5,7 +5,8 @@
 #include "pgenIO.h"
 #include "pgenContext.h"
 #include "pgenException.h"
-#include "pgenVariantCountException.h"
+#include "pgenMissingVariantsException.h"
+#include "pgenEmptyPgenException.h"
 
 using namespace pgenlib;
 
@@ -49,7 +50,7 @@ Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv *env, jclass object
         throwAsyncJavaException(
             env,
             "Native code failure getting address for allele codes in appendAlleles",
-            "org/broadinstitute/pgen/PgenJniException");
+            "org/broadinstitute/pgen/PgenException");
         return false;
     } else {
         PgenContext *pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
@@ -69,25 +70,28 @@ Java_org_broadinstitute_pgen_PgenWriter_closePgen(JNIEnv *env, jclass object, jl
     try {
         closePgen(pgenContext, droppedVariantCount);
         return true;
-    } catch (PgenVariantCountException &e) {
+    } catch (PgenMissingVariantsException &e) {
         // Don't re-throw variant count exceptions as a Java exception, since this function is called from the
         // close method of the Java writer. If the writer was created in a try-with-resources, and writing has
         // terminated prematurely (i.e., in the course of writing the pgen another exception has *already* been
-        // thrown), throwing  again from the close method will suppress the original exception. So just write
-        // the message to stderr and return true.
-
-        //TODO: alternatively, we COULD throw a Java version of the variant count exception so that callers can
-        // catch that
+        // thrown), throwing  again from the close method will cause the original exception to be suppressed.
+        // So just write the message to stderr and return true.
         std::cerr << "Variant count mismatch detected on close (exception suppressed)" << e.what() << " \n";
         return true;
     } catch (PgenException &e) {
-        // let any other PgenException propagate, but since throwing a Java exception from the close method of
-        // the writer can create mask a previous exception if it happens in a try-with-resources, log the
-        // original error to stderr before we propagate the exception
+        // Let any other PgenException propagate, but since throwing a Java exception from the close method of
+        // the writer can mask a previous exception if it happens in a try-with-resources, log the original
+        // error to stderr before we propagate the exception.
         std::cerr << "Error ocurred in  native code during close: " << e.what();
         reThrowAsAsyncJavaException(env, e, "Native code failure closing pgen context");
         throw e;
-    }
+    } catch (PgenEmptyPgenException &e) {
+        // no variants were written - an empty PGEN isn't valid, so give the caller a chance to hande/report that
+        throwAsyncJavaException(
+            env,
+            e.what(),
+            "org/broadinstitute/pgen/PgenEmptyPgenException");
+   }
 }
 
 JNIEXPORT jlong JNICALL
@@ -104,7 +108,7 @@ Java_org_broadinstitute_pgen_PgenWriter_createBuffer( JNIEnv *env, jclass cls, j
         throwAsyncJavaException(
             env,
             "Native code failure allocating memory for ByteBuffer",
-            "org/broadinstitute/pgen/PgenJniException");
+            "org/broadinstitute/pgen/PgenException");
         return nullptr;
     }
     return env->NewDirectByteBuffer(buf, length);
@@ -117,7 +121,7 @@ Java_org_broadinstitute_pgen_PgenWriter_destroyByteBuffer( JNIEnv *env, jclass c
         throwAsyncJavaException(
             env,
             "Native code failure getting ByteBuffer address to free",
-            "org/broadinstitute/pgen/PgenJniException");
+            "org/broadinstitute/pgen/PgenException");
         return false;
     }
     free(buf);

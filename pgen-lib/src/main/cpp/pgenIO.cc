@@ -2,7 +2,8 @@
 
 #include "pgenContext.h"
 #include "pgenException.h"
-#include "pgenVariantCountException.h"
+#include "pgenMissingVariantsException.h"
+#include "pgenEmptyPgenException.h"
 #include "pgenUtils.h"
 #include "pgenIO.h"
 #include "pgenlib_misc.h"
@@ -347,7 +348,7 @@ namespace pgenlib {
             // writer can catch and handle that case without propagating it, because throwing from the Closeable
             // "close" method, when the writer is created within a try-with-resources statement can mask other
             // exceptions
-            throw PgenVariantCountException(errMessage);
+            throw PgenMissingVariantsException(errMessage);
         } else if (writtenVariantCt != 0) {
             // guard against calling the plink2 finish/cleanup methods in the case where no writes have been made
             // because doing so triggers asserts in the plink code, presumably because downstream code paths can't
@@ -364,9 +365,15 @@ namespace pgenlib {
                 throwOnPglErr(cleanupErr, "Error cleaning up on pgen close: CleanupSpgw");
             }
         }
+
         free(pGenContext->spgwp);
         plink2::aligned_free(pGenContext->spgw_alloc);
-        free(reinterpret_cast<void*>(const_cast<PgenContext *>(pGenContext)));
+        free(reinterpret_cast<void *>(const_cast<PgenContext *>(pGenContext)));
+
+        if (writtenVariantCt == 0) {
+            throw PgenEmptyPgenException(
+                    "An empty PGEN is not valid - at least one variant site must be written to a PGEN. The PGEN file is not valid");
+        }
     }
 
     long getNumberOfVariantsWritten(const PgenContext *const pGenContext) {

@@ -4,7 +4,7 @@
 using namespace pgenlib;
 using namespace std;
 
-// Throw a Java exception (PgenJniException) with the given error message. Note that control RETURNS
+// Throw a Java exception (PgenException) with the given error message. Note that control RETURNS
 // to the caller after the exception is thrown.
 //
 bool throwAsyncJavaException( JNIEnv* env, const char* message, const char *javaExceptionClassName ) {
@@ -30,7 +30,7 @@ bool reThrowAsAsyncJavaException( JNIEnv* env, const PgenException& pgenExceptio
     static constexpr int kReservedMessageBufSize = 1024;
     static char reservedForExceptionMessage[kReservedMessageBufSize];
     snprintf(reservedForExceptionMessage, kReservedMessageBufSize, "%s / %s", pgenException.what(), context);
-    return throwAsyncJavaException(env, reservedForExceptionMessage, "org/broadinstitute/pgen/PgenJniException");
+    return throwAsyncJavaException(env, reservedForExceptionMessage, "org/broadinstitute/pgen/PgenException");
 }
 
         

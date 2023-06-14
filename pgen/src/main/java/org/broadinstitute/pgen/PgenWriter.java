@@ -129,14 +129,14 @@ public class PgenWriter implements VariantContextWriter {
         final int maxAltAlleles) {
 
         if (!pgenFile.hasExtension(PGEN_EXTENSION)) {
-            throw new PgenJniException(
+            throw new PgenException(
                 String.format("Invalid pgen file name: %s. pgen files must use the .pgen extension", pgenFile.getRawInputString()));
         }
         if (!pgenFile.getScheme().equals("file")) {
-            throw new PgenJniException(String.format("Invalid pgen file name: %s. pgen files must be local files", pgenFile));
+            throw new PgenException(String.format("Invalid pgen file name: %s. pgen files must be local files", pgenFile));
         }
         if (maxAltAlleles > PLINK2_MAX_ALTERNATE_ALLELES) {
-            throw new PgenJniException(
+            throw new PgenException(
                 String.format("Requested max alternate alleles of (%d) exceeds the supported pgen max of (%d)",
                     maxAltAlleles,
                     PLINK2_MAX_ALTERNATE_ALLELES));
@@ -224,7 +224,7 @@ public class PgenWriter implements VariantContextWriter {
      
         for (final Genotype g : vc.getGenotypes()) {
             if (g.getPloidy() != 2) {
-                throw new PgenJniException(
+                throw new PgenException(
                     "PGEN only supports diploid samples and we see one with ploidy = " + g.getPloidy()
                         + " at line " + vc.toStringWithoutGenotypes());
             }

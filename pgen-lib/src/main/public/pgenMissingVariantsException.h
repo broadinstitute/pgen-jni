@@ -1,19 +1,19 @@
 //
 //
 
-#ifndef PGEN_LIB_PGENVARIANTCOUNTEXCEPTION_H
-#define PGEN_LIB_PGENVARIANTCOUNTEXCEPTION_H
+#ifndef PGEN_LIB_PGENMISSINGVARIANTSEXCEPTION_H
+#define PGEN_LIB_PGENMISSINGVARIANTSEXCEPTION_H
 #include <exception>
-#include "plink2_base.h"
+#include "pgenException.h"
 
 namespace pgenlib {
     // Exception class for the specific case where too few variants have been written when closePgen is called
-    class PgenVariantCountException : public std::exception {
+    class PgenMissingVariantsException : public std::exception {
     private:
         const char *message;
 
     public:
-        PgenVariantCountException(const char* message) {
+        PgenMissingVariantsException(const char* message) {
             // make a copy in our reserved memory, since the caller is probably about to throw...
             this->message = strncpy(reservedForExceptionMessage, message, kReservedMessageBufSize);
         }
@@ -22,8 +22,8 @@ namespace pgenlib {
             return message;
         }
 
-        PgenVariantCountException(const PgenVariantCountException&) throw() = default;
+        PgenMissingVariantsException(const PgenMissingVariantsException&) throw() = default;
     };
 }
 
-#endif //PGEN_LIB_PGENVARIANTCOUNTEXCEPTION_H
+#endif //PGEN_LIB_PGENMISSINGVARIANTSEXCEPTION_H

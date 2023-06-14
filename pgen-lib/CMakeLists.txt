@@ -16,11 +16,13 @@ add_executable(pgen_lib
         src/main/public/pgenIO.h
         src/main/public/pgenContext.h
         src/main/public/pgenException.h
-        src/main/public/pgenVariantCountException.h
+        src/main/public/pgenMissingVariantsException.h
+        src/main/public/pgenEmptyPgenException.h
         src/main/public/pgenUtils.h
 
         # implementation of the C++ public API (callable by the JNI layer)
         src/main/cpp/pgenIO.cc
+        src/main/cpp/pgenUtils.cpp
 
         # plink headers
         src/main/headers/pgenlib_ffi_support.h
@@ -40,4 +42,4 @@ add_executable(pgen_lib
 
         # test code
         /usr/local/boost/boost/test/included/unit_test.hpp
-        src/test/cpp/test_pgenlib_write.cc src/main/cpp/pgenUtils.cpp)
+        src/test/cpp/test_pgenlib_write.cc)
