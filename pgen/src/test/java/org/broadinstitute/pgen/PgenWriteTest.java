@@ -135,13 +135,6 @@ public class PgenWriteTest {
         final TestUtils.PgenFileSet jniFileSet = TestUtils.vcfToPgen_jni(originalVCF, pgenWriteMode, useTrueVariantCount);
         final TestUtils.PgenFileSet plink2FileSet = TestUtils.vcfToPgen_plink2(originalVCF);
 
-        //System.out.println(String.format(
-        //    "%s: mode: %s/%s",
-        //     originalVCF.toString(),
-        //      pgenWriteMode.toString(), useTrueVariantCount == true ? "actual" : "max"));
-        //TestUtils.displayPGENSize(jniFileSet.pGenPath(), "jni");
-        //TestUtils.displayPGENSize(plink2FileSet.pGenPath(), "plink2");
-        
         // now use plink2 to validate both of the generated pgen file sets
         if (pgenWriteMode != PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX) {
             // while we're at it, run plink2 --pgen-diff on the outputs
