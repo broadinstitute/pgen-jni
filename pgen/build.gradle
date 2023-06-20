@@ -1,13 +1,18 @@
+import org.gradle.internal.os.OperatingSystem
+
 plugins {
     id 'java'
     id 'dev.nokee.jni-library'
     id 'dev.nokee.cpp-language'
+    id 'maven-publish'
 }
 
 repositories {
     // Use Maven Central for resolving dependencies.
     mavenCentral()
 }
+
+final isRelease = Boolean.getBoolean("release")
 
 sourceCompatibility = 1.17
 targetCompatibility = 1.17
@@ -20,6 +25,11 @@ buildTypes {
     debug
     release
 }
+
+// def printOS() {
+//     print "OS: "
+//     println(OperatingSystem.current().isMacOsX())
+// }
 
 dependencies {
     //TODO upgrade to 3.0.3
@@ -46,10 +56,118 @@ tasks.withType(CppCompile).configureEach {
     compilerArgs.add "-std=c++11"
 }
 
+logger.info("$project.buildDir/libs/main/macos/libpgen.dylib")
+
+jar {
+    dependsOn {
+        if (OperatingSystem.current().isMacOsX()) {
+            ":pgen:linkMacos"
+        } else if (OperatingSystem.current().isLinux()) {
+            ":pgen:linkLinux"
+        } else {
+            throw org.gradle.api.tasks.StopExecutionException("unsupported platform - only linux and macos are supported");
+        }
+    }
+    from("$project.buildDir/libs/main/") {
+         if (OperatingSystem.current().isMacOsX()) {
+            include "macos/libpgen.dylib"
+        } else if (OperatingSystem.current().isLinux()) {
+            include "linux/libpgen.so"
+        } else {
+            throw org.gradle.api.tasks.StopExecutionException("unsupported platform - only linux and macos are supported");
+        }
+    }
+}
+
 tasks.named('test') {
     // Use TestNG for unit tests.
     useTestNG()
     testLogging {
         showStandardStreams = true
+    }
+}
+
+javadoc {
+    // This is a hack to disable the java default javadoc lint until we fix the html formatting
+    // We only want to do this for the javadoc task, not gatkDoc
+    options.addStringOption('Xdoclint:none', '-quiet')
+    source = sourceSets.main.allJava
+    include '**/*.java'
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    archiveClassifier = 'javadoc'
+    from "$buildDir/docs"
+}
+
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allSource
+    archiveClassifier = 'sources'
+}
+
+def basePomConfiguration = {
+    packaging = 'jar'
+    description = 'JNI Wrapper for pgenlib'
+    url = 'http://github.com/broadinstitute/gatk'
+
+    scm {
+        url = 'scm:git@github.com:broadinstitute/gatk.git'
+        connection = 'scm:git@github.com:broadinstitute/gatk.git'
+        developerConnection = 'scm:git@github.com:broadinstitute/gatk.git'
+    }
+
+    developers {
+        developer {
+            id = 'gatkdev'
+            name = 'GATK Development Team'
+            email = 'gatk-dev-public@broadinstitute.org'
+        }
+    }
+
+    licenses {
+        license {
+            name = 'Apache 2.0'
+            url = 'https://github.com/broadinstitute/gatk/blob/master/LICENSE.TXT'
+            distribution = 'repo'
+        }
+    }
+}
+
+publishing {
+    publications {
+        pgenlib(MavenPublication) {
+            from components.java
+            artifactId = "pgenlib"
+            pom basePomConfiguration
+
+            artifact sourcesJar
+            artifact javadocJar
+        }
+    }
+
+    repositories {
+        maven {
+            name = "SonaType"
+            url =  "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+            credentials {
+                username = project.findProperty("sonatypeUsername")
+                password = project.findProperty("sonatypePassword")
+            }
+        }
+
+        maven {
+            name = "Artifactory"
+            url = "https://broadinstitute.jfrog.io/broadinstitute/libs-snapshot-local/"
+            credentials {
+                username = System.env.ARTIFACTORY_USERNAME
+                password = System.env.ARTIFACTORY_PASSWORD
+            }
+        }
+    }
+}
+
+publish {
+    doFirst {
+        println "Attempting to upload version:$version"
     }
 }
