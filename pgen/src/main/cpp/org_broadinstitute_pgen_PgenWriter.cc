@@ -76,7 +76,7 @@ Java_org_broadinstitute_pgen_PgenWriter_closePgen(JNIEnv *env, jclass object, jl
         // terminated prematurely (i.e., in the course of writing the pgen another exception has *already* been
         // thrown), throwing  again from the close method will cause the original exception to be suppressed.
         // So just write the message to stderr and return true.
-        std::cerr << "Variant count mismatch detected on close (exception suppressed)" << e.what() << " \n";
+        std::cerr << "Variant count mismatch detected on close (exception suppressed): " << e.what() << " \n";
         return true;
     } catch (PgenException &e) {
         // Let any other PgenException propagate, but since throwing a Java exception from the close method of
