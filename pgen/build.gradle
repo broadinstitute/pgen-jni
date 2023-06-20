@@ -5,6 +5,7 @@ plugins {
     id 'dev.nokee.jni-library'
     id 'dev.nokee.cpp-language'
     id 'maven-publish'
+    id 'com.palantir.git-version' version '3.0.0'
 }
 
 repositories {
@@ -13,6 +14,7 @@ repositories {
 }
 
 final isRelease = Boolean.getBoolean("release")
+version = gitVersion().replaceAll(".dirty", "") + (isRelease ?  "" : "-SNAPSHOT")
 
 sourceCompatibility = 1.17
 targetCompatibility = 1.17
@@ -25,11 +27,6 @@ buildTypes {
     debug
     release
 }
-
-// def printOS() {
-//     print "OS: "
-//     println(OperatingSystem.current().isMacOsX())
-// }
 
 dependencies {
     //TODO upgrade to 3.0.3
@@ -56,26 +53,27 @@ tasks.withType(CppCompile).configureEach {
     compilerArgs.add "-std=c++11"
 }
 
-logger.info("$project.buildDir/libs/main/macos/libpgen.dylib")
-
 jar {
+    // add the native component (for the platform on which we're running) to the default jar
     dependsOn {
         if (OperatingSystem.current().isMacOsX()) {
-            ":pgen:linkMacos"
+            sharedLibraryMacos
         } else if (OperatingSystem.current().isLinux()) {
-            ":pgen:linkLinux"
+            sharedLibraryLinux
         } else {
             throw org.gradle.api.tasks.StopExecutionException("unsupported platform - only linux and macos are supported");
         }
     }
-    from("$project.buildDir/libs/main/") {
-         if (OperatingSystem.current().isMacOsX()) {
-            include "macos/libpgen.dylib"
-        } else if (OperatingSystem.current().isLinux()) {
-            include "linux/libpgen.so"
-        } else {
-            throw org.gradle.api.tasks.StopExecutionException("unsupported platform - only linux and macos are supported");
+    if (OperatingSystem.current().isMacOsX()) {
+        from("$project.buildDir/libs/main/macos") {
+            include "libpgen.dylib"
         }
+    } else if (OperatingSystem.current().isLinux()) {
+        from("$project.buildDir/libs/main/linux") {
+            include "libpgen.so"
+        }
+    } else {
+        throw org.gradle.api.tasks.StopExecutionException("unsupported platform - only linux and macos are supported");
     }
 }
 
@@ -136,7 +134,8 @@ def basePomConfiguration = {
 publishing {
     publications {
         pgenlib(MavenPublication) {
-            from components.java
+            //from components.java
+            artifact jar
             artifactId = "pgenlib"
             pom basePomConfiguration
 
