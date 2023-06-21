@@ -1,8 +1,13 @@
 {
     "java.test.config": {
         "name": "pgenTestConfiguration",
-        "vmArgs": ["-Djava.library.path=/Users/cnorman/projects/pgen-jni/pgen/build/libs/main/macos"]
+        "vmArgs": ["-Djava.library.path=/Users/cnorman/projects/pgen-jni/pgen/build/libs/main/macos", "-DLOAD_PGEN_FROM_LIBRARY_PATH=true"]
     },
     "java.configuration.updateBuildConfiguration": "automatic",
-    "java.test.defaultConfig" : "pgenTestConfiguration"
+    "java.test.defaultConfig": "pgenTestConfiguration",
+    "cmake.sourceDirectory": "/Users/cnorman/projects/pgen-jni/pgen-lib",
+    "files.associations": {
+        "*.ipp": "cpp",
+        "iostream": "cpp"
+    }
 }

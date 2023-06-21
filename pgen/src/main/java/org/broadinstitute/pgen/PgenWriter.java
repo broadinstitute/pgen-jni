@@ -62,6 +62,10 @@ public class PgenWriter implements VariantContextWriter {
     public static String PVAR_EXTENSION = ".pvar";
     public static String PSAM_EXTENSION = ".psam";
  
+    // If this java property is set/exists, the pgen native component will be loaded from the java.libary.path,
+    // otherwise it is assumed to be included as a resource at the top level of a jar on the classpath.
+    private static final String LOAD_PGEN_FROM_LIBRARY_PATH = "LOAD_PGEN_FROM_LIBRARY_PATH";
+
     /**
      * Enum for representing the plink2 pgen file write modes. See plink2::PgenWriteMode.
      */
@@ -104,9 +108,19 @@ public class PgenWriter implements VariantContextWriter {
    // ******************** End Native JNI methods  ********************
  
     static {
-        System.loadLibrary("pgen");
+        if (System.getProperty(LOAD_PGEN_FROM_LIBRARY_PATH) != null) {
+            // for local testing within the IDE
+            System.loadLibrary("pgen");
+        } else {
+            // otherwise, load it from a jar file on the classpath
+            NativeLibraryUtils.loadLibraryFromClasspath(
+                NativeLibraryUtils.runningOnMac() ?
+                    "/libpgen.dylib" :
+                    "/libpgen.so"
+            );
+        }
     }
-
+ 
     /**
      * Create a PGEN writer. The writer creats a PGEN file set (.pgen and .pvar/.psam files). Depending on the file
      * mode used, may also create a .pgen.pgi file.

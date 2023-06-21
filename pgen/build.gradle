@@ -29,14 +29,15 @@ buildTypes {
 }
 
 dependencies {
-    //TODO upgrade to 3.0.3
     api 'com.github.samtools:htsjdk:3.0.0'
+
+    implementation 'org.apache.commons:commons-lang3:3.5'
+    implementation 'commons-io:commons-io:2.5'
 
     nativeImplementation project(':pgen-lib')
 
     // Use TestNG framework, also requires calling test.useTestNG() below
     testImplementation 'org.testng:testng:7.4.0'
-
 }
 
 // Some compiler configuration
@@ -82,6 +83,16 @@ tasks.named('test') {
     useTestNG()
     testLogging {
         showStandardStreams = true
+    }
+    // set the variable that causes the native component to be loaded from java.library.path so that we can run
+    // tests locally without a jar
+    jvmArgs += "-DLOAD_PGEN_FROM_LIBRARY_PATH=true"
+    if (OperatingSystem.current().isMacOsX()) {
+        jvmArgs += "-Djava.library.path=/Users/cnorman/projects/pgen-jni/pgen/build/libs/main/macos"
+    } else if (OperatingSystem.current().isLinux()) {
+        jvmArgs += "-Djava.library.path=/Users/cnorman/projects/pgen-jni/pgen/build/libs/main/linux"
+    } else {
+        throw org.gradle.api.tasks.StopExecutionException("unsupported platform - only linux and macos are supported");
     }
 }
 
