@@ -8,7 +8,7 @@ ENV HOME /root
 
 SHELL ["/bin/bash", "-c"]
 
-RUN apt update && apt upgrade
+# RUN apt update && apt upgrade
 RUN apt-get update && \
     apt-get -y --no-install-recommends install \
     build-essential \
