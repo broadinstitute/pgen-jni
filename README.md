@@ -55,7 +55,13 @@ There are two C++ namespaces exposed to callers of the C++ code in pgen-lib:
 - pgenlib - the C/C++ calleable types and functions that are used by the JNI layer (and implemented in the pgen-lib subproject)
 - plink2 - the C/C++ types and functions that are part of the plink2 implementation, that are used by the pgenlib implementation
 
+## Licensing
+With the exception of the files in pgen-lib folder, this project is
+licensed under the Apache License, Version 2.0 (the "License");
+- You may not use this software except in compliance with the License.
+- You may obtain a copy of the License at:
 
+       http://www.apache.org/licenses/LICENSE-2.0
 
-
-
+The files in the subproject located in the pgen-lib folder, some of which are from the plink-ng/plink2 project
+(https://github.com/chrchang/plink-ng), are licensed under the Lesser GPL license. See the file pgen-lib/COPYING.lesser.

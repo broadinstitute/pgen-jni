@@ -1,3 +1,7 @@
+/**
+ * Copyright (c) 2023, Broad Institute, Inc. All rights reserved.
+ */
+
 #ifndef __PGEN_JNI_UTILS_H__
 #define __PGEN_JNI_UTILS_H__
 

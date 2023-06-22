@@ -1,3 +1,7 @@
+/**
+ * Copyright (c) 2023, Broad Institute, Inc. All rights reserved.
+ */
+
 package org.broadinstitute.pgen;
 
 import java.io.File;
