@@ -121,6 +121,11 @@ public class TestUtils {
                     useTrueVariantCount == true ? vcfMetaData.nVariants : PgenWriter.VARIANT_COUNT_UNKNOWN,
                     PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES)) {
             reader.forEach(vc -> writer.add(vc));
+            // display the variant counts
+            System.out.println(String.format(
+                    "%d variants written\n%d variants dropped",
+                    writer.getWrittenVariantCount(),
+                    writer.getDroppedVariantCount()));
         }
         return pgenFileSet;
     }
