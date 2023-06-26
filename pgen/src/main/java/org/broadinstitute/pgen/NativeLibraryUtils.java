@@ -21,7 +21,7 @@ import java.util.Set;
 
 /**
  * Utilities to provide architecture-dependent native functions
- * 
+ *
  * IMPORTANT: be careful when modifiying this code, since most of it is used to extract a resource from a jar,
  * and as a result is neither covered by tests, nor ever executed by this project. It is only used to load
  * the native components when the jar produced by this project is used in another project.
@@ -41,10 +41,12 @@ public final class NativeLibraryUtils {
 
             final InputStream inputStream;
             if (relativeClass == null) {
+                System.out.println("relative class null ");
                 inputStream = ClassLoader.getSystemResourceAsStream(path);
                 if (inputStream == null)
                     throw new IllegalArgumentException("Resource not found: " + path);
             } else {
+                System.out.println("relative class: " + relativeClass);
                 inputStream = relativeClass.getResourceAsStream(path);
                 if (inputStream == null)
                     throw new IllegalArgumentException("Resource not found relative to " + relativeClass + ": " + path);
@@ -67,6 +69,7 @@ public final class NativeLibraryUtils {
             try {
                 outputStream = FileUtils.openOutputStream(file);
                 org.apache.commons.io.IOUtils.copy(inputStream, outputStream);
+                System.out.println("stream copied: " + relativeClass);
             } catch (IOException e) {
                 throw new RuntimeException(String.format("Unable to copy resource '%s' to '%s'", path, file), e);
             } finally {
@@ -98,16 +101,21 @@ public final class NativeLibraryUtils {
      * @return true if the library was extracted and loaded successfully, otherwise false
      */
     public static boolean loadLibraryFromClasspath( final String libraryPathInJar ) {
-    //    Utils.nonNull(libraryPathInJar);
-    //    Utils.validateArg(libraryPathInJar.startsWith("/"), "library path in jar must be absolute");
+        //    Utils.nonNull(libraryPathInJar);
+        //    Utils.validateArg(libraryPathInJar.startsWith("/"), "library path in jar must be absolute");
 
         try {
             final File extractedLibrary = writeTempResourceFromPath(libraryPathInJar, NativeLibraryUtils.class);
+            System.out.println("Extracted lib: " + extractedLibrary);
             extractedLibrary.deleteOnExit();
+            System.out.println("Attempting to load: " + extractedLibrary);
             System.load(extractedLibrary.getAbsolutePath());
+            System.out.println("Loaded: " + extractedLibrary);
         }
         catch ( UnsatisfiedLinkError e ) {
-            return false;
+            System.out.println("UnsatisfiedLinkError thrown: " + e.getMessage());
+            throw new RuntimeException(e);
+            //return false;
         }
 
         return true;
@@ -127,7 +135,9 @@ public final class NativeLibraryUtils {
         try {
             final Resource resource = new Resource(resourcePath, relativeClass);
             final File tmpDir = createTempDir("nativeResource");
+            System.out.println("Temp dir created: " + tmpDir);
             final File tempFile = File.createTempFile(FilenameUtils.getBaseName(resource.path()), "." + FilenameUtils.getExtension(resource.path()), tmpDir);
+            System.out.println("Temp file created: " + tempFile);
             tempFile.deleteOnExit();
 
             resource.writeResource(tempFile);
@@ -151,11 +161,12 @@ public final class NativeLibraryUtils {
     static File createTempDir(String prefix) {
         try {
             final Path tmpDir = Files.createTempDirectory(prefix).normalize();
+            System.out.println("temp dir created: " + tmpDir);
             tmpDir.toFile().deleteOnExit();
             return tmpDir.toFile();
         } catch (final IOException | SecurityException e) {
             throw new RuntimeException(String.format(
-                "Bad tmp dir: %s", e.getMessage()), e);
+                    "Bad tmp dir: %s", e.getMessage()), e);
         }
     }
 }
