@@ -127,7 +127,7 @@ public final class NativeLibraryUtils {
         try {
             final Resource resource = new Resource(resourcePath, relativeClass);
             final File tmpDir = createTempDir("nativeResource");
-            final File tempFile = File.createTempFile(FilenameUtils.getBaseName(resource.path()), FilenameUtils.getExtension(resource.path()), tmpDir);
+            final File tempFile = File.createTempFile(FilenameUtils.getBaseName(resource.path()), "." + FilenameUtils.getExtension(resource.path()), tmpDir);
             tempFile.deleteOnExit();
 
             resource.writeResource(tempFile);
