@@ -173,7 +173,6 @@ public class PgenWriteTest {
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 vcfMetaData.vcfHeader(),
                 PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK,
-                PgenWriter.VARIANT_COUNT_UNKNOWN,
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES))
         {
             // do nothing...
@@ -233,7 +232,6 @@ public class PgenWriteTest {
                     new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                     TestUtils.createSingleSampleVCFHeader(),
                     PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
-                    PgenWriter.VARIANT_COUNT_UNKNOWN,
                     PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES);
             final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false))
         {
@@ -293,7 +291,6 @@ public class PgenWriteTest {
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 TestUtils.createSingleSampleVCFHeader(),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
-                PgenWriter.VARIANT_COUNT_UNKNOWN,
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES);
         } catch (final PgenException e) {
             // we expect a PgenException in this test, but not from the constructor, so make sure we don't

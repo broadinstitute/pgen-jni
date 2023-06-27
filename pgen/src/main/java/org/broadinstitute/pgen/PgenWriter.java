@@ -136,6 +136,26 @@ public class PgenWriter implements VariantContextWriter {
         final HtsPath pgenFile,
         final VCFHeader vcfHeader,
         final PgenWriteMode pgenWriteMode,
+        final int maxAltAlleles) {
+            this(pgenFile, vcfHeader, pgenWriteMode, VARIANT_COUNT_UNKNOWN, PLINK2_MAX_ALTERNATE_ALLELES);
+    }
+
+    /**
+     * Create a PGEN writer. The writer creats a PGEN file set (.pgen and .pvar/.psam files). Depending on the file
+     * mode used, may also create a .pgen.pgi file.
+     * 
+     * Supports only diploid sites with fewer than {@code PLINK2_MAX_ALTERNATE_ALLELES} (this value can be
+     * furhter limited using {@code maxAltAlleles}. Sites that exceed this number are silently dropped.
+     * 
+     * If the actual number of variants is not known at the time the constructor is called, use the value
+     * {@code PgenWriter.VARIANT_COUNT_UNKNOWN} for the {@code numberOfVariants} argument.
+     * 
+     * NOTE: Currently this writer doesn't preserve genotype phasing.
+     */
+    public PgenWriter(
+        final HtsPath pgenFile,
+        final VCFHeader vcfHeader,
+        final PgenWriteMode pgenWriteMode,
         final long numberOfVariants,
         final int maxAltAlleles) {
 
