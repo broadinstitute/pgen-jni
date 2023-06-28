@@ -24,6 +24,7 @@ JNIEXPORT jlong JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass object,
                                                  jstring filename,
                                                  jint pgenWriteModeInt,
+                                                 jint writeFlags,
                                                  jlong numberOfVariants,
                                                  jint sampleCount,
                                                  jint maxAltAlleles) {
@@ -33,7 +34,7 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass object,
  
     jlong pgenHandle;
     try {
-        PgenContext* const pgenContext = openPgen(cFilename, pgenWriteModeInt, numberOfVariants, sampleCount, maxAltAlleles);
+        PgenContext* const pgenContext = openPgen(cFilename, pgenWriteModeInt, static_cast<unsigned int>(writeFlags), numberOfVariants, sampleCount, maxAltAlleles);
         env->ReleaseStringUTFChars (filename, cFilename);
         pgenHandle = reinterpret_cast<jlong>(pgenContext);
     } catch (const PgenException& e) {
@@ -48,7 +49,8 @@ JNIEXPORT jboolean JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv *env, jclass object,
                                                       jlong pgenHandle,
                                                       jobject alleleBuffer,
-                                                      jint alleleCount){
+                                                      jobject phaseBuffer,
+                                                      jint alleleCount) {
     const int32_t *allele_codes = reinterpret_cast<int32_t*>(env->GetDirectBufferAddress(alleleBuffer));
     if ( !allele_codes ) {
         throwAsyncJavaException(
@@ -57,13 +59,22 @@ Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv *env, jclass object
             "org/broadinstitute/pgen/PgenException");
         return false;
     } else {
-        PgenContext *pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
-        try {
-            appendAlleles(pgenContext, allele_codes, alleleCount);
-            return true;
-        } catch (const PgenException &e) {
-            reThrowAsAsyncJavaException(env, e, "Native code failure in appendAlleles");
+        const unsigned char *phase_buffer = reinterpret_cast<unsigned char*>(env->GetDirectBufferAddress(phaseBuffer));
+        if ( !phase_buffer ) {
+            throwAsyncJavaException(
+                env,
+                "Native code failure getting address for phaseBuffer in appendAlleles",
+                "org/broadinstitute/pgen/PgenException");
             return false;
+        } else {
+            PgenContext *pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
+            try {
+                appendAlleles(pgenContext, allele_codes, phase_buffer, alleleCount);
+                return true;
+            } catch (const PgenException &e) {
+                reThrowAsAsyncJavaException(env, e, "Native code failure in appendAlleles");
+                return false;
+            }
         }
     }
 }

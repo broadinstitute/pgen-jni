@@ -10,8 +10,8 @@ namespace pgenlib {
     const uint32_t kVariantCountUnknown = plink2::kPglMaxVariantCt;
 
     // the public interface to the pgen writer
-    PgenContext *openPgen(const char *cFilename, const int pgenWriteModeInt, const long variantCount, const int sampleCount, const int maxAltAlleles);
-    void appendAlleles(const PgenContext *const pGenContext, const int32_t* allele_codes, int32_t allele_ct);
+    PgenContext *openPgen(const char *cFilename, const int pgenWriteModeInt, const unsigned int pgenWriteFlags, const long variantCount, const int sampleCount, const int maxAltAlleles);
+    void appendAlleles(const PgenContext *const pGenContext, const int32_t* allele_codes, const unsigned char* phase_bytes, int32_t allele_ct);
     void closePgen(const PgenContext *const pGenContext, const long nDroppedVariants);
     long getNumberOfVariantsWritten(const PgenContext *const pGenContext);
 

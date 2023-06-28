@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -114,7 +115,8 @@ public class TestUtils {
     public static PgenFileSet vcfToPgen_jni(
             final Path originalVCF,
             final PgenWriteMode pgenWriteMode,
-            final boolean useTrueVariantCount) throws IOException, InterruptedException {
+            final boolean useTrueVariantCount,
+            final EnumSet<PgenWriter.PgenWriteFlag> writeFlags) throws IOException, InterruptedException {
         final PgenFileSet pgenFileSet = PgenFileSet.createTempPgenFileSet("vcfToPgen_jni");
         final VcfMetaData vcfMetaData = getVcfMetaData(originalVCF);
         try(final VCFFileReader reader = new VCFFileReader(originalVCF, false);
@@ -122,6 +124,7 @@ public class TestUtils {
                     new HtsPath(pgenFileSet.pGenPath.toAbsolutePath().toString()),
                     vcfMetaData.vcfHeader,
                     pgenWriteMode,
+                    writeFlags,
                     useTrueVariantCount == true ? vcfMetaData.nVariants : PgenWriter.VARIANT_COUNT_UNKNOWN,
                     PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES)) {
             reader.forEach(vc -> writer.add(vc));
@@ -288,6 +291,11 @@ public class TestUtils {
         // since we don't currently preserve phasing, use sameGenotype(true) to ignore phasing
         Assert.assertTrue(expected.sameGenotype(actual, ignorePhasing), "Genotype alleles");
         if (!ignorePhasing) {
+            final String actGenString= actual.getGenotypeString();
+            final String expGenString = expected.getGenotypeString();
+            if (!actGenString.equals(expGenString)) {
+                int i = 37;
+            }
             Assert.assertEquals(actual.getGenotypeString(), expected.getGenotypeString(), "Genotype string");
         }
     }

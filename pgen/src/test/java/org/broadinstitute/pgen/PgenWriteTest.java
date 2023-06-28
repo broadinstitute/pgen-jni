@@ -11,6 +11,8 @@ import htsjdk.variant.variantcontext.GenotypeBuilder;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
 import htsjdk.variant.vcf.VCFFileReader;
+
+import org.broadinstitute.pgen.PgenWriter.PgenWriteFlag;
 import org.broadinstitute.pgen.PgenWriter.PgenWriteMode;
 import org.broadinstitute.pgen.TestUtils.PgenFileSet;
 import org.testng.Assert;
@@ -23,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 
 public class PgenWriteTest {
@@ -38,7 +41,7 @@ public class PgenWriteTest {
                 new HtsPath(pgenFileSet.getFileSetPrefix()),
                 TestUtils.createSingleSampleVCFHeader(),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
-                6,
+                EnumSet.noneOf(PgenWriteFlag.class),
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES);
         } catch (final PgenException e) {
             Assert.assertNotNull(e.getMessage().contains("kPglRetOpenFail"));
@@ -56,6 +59,7 @@ public class PgenWriteTest {
                     new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                     vcfMetaData.vcfHeader(),
                     PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
+                    EnumSet.noneOf(PgenWriteFlag.class),
                     vcfMetaData.nVariants(),
                     PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES
                     )) {
@@ -70,7 +74,7 @@ public class PgenWriteTest {
     @DataProvider(name="roundTripCompareWithPlink2Provider")
     public Object[][] roundTripCompareWithPlink2Provider() {
         return new Object[][] {
-            // This test creates a PGEN from a VCF, and then validates the generated PGEN by:
+            // Cases for a test that creates a PGEN from a VCF, and then validates the generated PGEN by:
             //
             //  1) Using plink2 to directly generate a PGEN from the same input VCF.
             //  2) Using plink2 to directly validate both the plink2-generated and pgen-jni-generated PGENs.
@@ -86,41 +90,46 @@ public class PgenWriteTest {
             // on the command line via the "--output-chr" argument, each of these test cases has to include an appropriate
             // "--output-chr" argument in order to make the subsequent VCF comparison to the original succeed. See
             // https://www.cog-genomics.org/plink/2.0/data#irreg_output.
+
+            // format
+            // file name, write mode, use true variant count, extra plink args, write flags
             
             // small, all bi-allelic, unphased (6 variants/3 samples), test once for each write mode, and for write mode != PGEN_FILE_MODE_BACKWARD_SEEK,
             // also test with variant count provided up front or not (PGEN_FILE_MODE_BACKWARD_SEEK always requires an acccurate variant count)
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, true, "--output-chr M" },
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr M" },
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr M" },
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, true, "--output-chr M" },
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, false, "--output-chr M" },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, true, "--output-chr M", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr M", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr M", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, true, "--output-chr M", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, false, "--output-chr M", EnumSet.noneOf(PgenWriteFlag.class) },
 
             // slightly larger, all bi-allelic, phased (600 variants/2504 samples); the genotype concordance validation ignores
             // phasing for now since its not preserved by the pgen writer)
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, true, "--output-chr M" },
-
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr M" },
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr M" },
-
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, true, "--output-chr M" },
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, false, "--output-chr M" },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, true, "--output-chr M", EnumSet.of(PgenWriteFlag.PRESERVE_PHASING) },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr M", EnumSet.of(PgenWriteFlag.PRESERVE_PHASING) },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr M", EnumSet.of(PgenWriteFlag.PRESERVE_PHASING) },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, true, "--output-chr M", EnumSet.of(PgenWriteFlag.PRESERVE_PHASING) },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, false, "--output-chr M", EnumSet.of(PgenWriteFlag.PRESERVE_PHASING) },
  
             // larger still, unphased, includes ~6000 multiallelic sites (~117,932 variants/10 samples)
-            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26" },
-            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26" },
-            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26" },
-            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26" },
+            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
 
-            {  Paths.get("testdata/hg38_trio.pik3ca.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26" },
-            {  Paths.get("testdata/hg38_trio.pik3ca.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26" },
+            {  Paths.get("testdata/hg38_trio.pik3ca.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
+            {  Paths.get("testdata/hg38_trio.pik3ca.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
             // same as hg38_trio.pik3ca.vcf above, but with the genotypes for the (multi-allelic) variant at 179135392 modified so the last site allele
             // is not referenced by any genotype, and the (multi-allelic) variant at site 179170076 modified so the middle (index 1) allele is not
             // referenced by any genotype; this triggers the issue described https://groups.google.com/g/plink2-users/c/Sn5qVCyDlDw/m/GOWScY6tAQAJ
-            { Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26" },
-            { Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26" }
-            // { Paths.get("testdata/external/0000000009-NHGRI_AnVIL_3K.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26" },
-            // { Paths.get("testdata/external/0000000004-NHGRI_AnVIL_3K.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26" },
-            //{ Paths.get("testdata/external/0000000002-NHGRI_AnVIL_3K.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26" }
+            { Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
+ 
+            // TODO: add multi-allelic AND phased tests
+
+            // temporary/local test cases
+            // { Paths.get("testdata/external/0000000009-NHGRI_AnVIL_3K.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
+            // { Paths.get("testdata/external/0000000004-NHGRI_AnVIL_3K.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
+            // { Paths.get("testdata/external/0000000002-NHGRI_AnVIL_3K.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) }
         };
     }
 
@@ -129,14 +138,15 @@ public class PgenWriteTest {
         final Path originalVCF,
         final PgenWriteMode pgenWriteMode,
         final boolean useTrueVariantCount,
-        final String extraPlinkArgs) throws IOException, InterruptedException {
+        final String extraPlinkArgs,
+        final EnumSet<PgenWriteFlag> writeFlags) throws IOException, InterruptedException {
 
         // the pgenlib api can't handle PGEN_FILE_MODE_BACKWARD_SEEK unless a true variant count is provided, so catch
         // attempts to test this combination
         Assert.assertTrue(useTrueVariantCount == true || pgenWriteMode != PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK);
  
         // first, convert the test VCF to pgen twice; once using the PgenWriter and once using plink2 directly
-        final TestUtils.PgenFileSet jniFileSet = TestUtils.vcfToPgen_jni(originalVCF, pgenWriteMode, useTrueVariantCount);
+        final TestUtils.PgenFileSet jniFileSet = TestUtils.vcfToPgen_jni(originalVCF, pgenWriteMode, useTrueVariantCount, writeFlags);
         final TestUtils.PgenFileSet plink2FileSet = TestUtils.vcfToPgen_plink2(originalVCF);
 
         // now use plink2 to validate both of the generated pgen file sets
@@ -156,10 +166,11 @@ public class PgenWriteTest {
         // plink2)
         final Path vcfFromPGEN_jni = TestUtils.pgenToVCF_plink2(jniFileSet, "FromJNI", extraPlinkArgs);
         final Path vcfFromPGEN_plink2 = TestUtils.pgenToVCF_plink2(plink2FileSet, "FromPlink2", extraPlinkArgs);
-        TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, vcfFromPGEN_plink2, true);
+        TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, vcfFromPGEN_plink2, !writeFlags.contains(PgenWriteFlag.PRESERVE_PHASING));
 
         // finally, for extra measure, compare the pgen-jni round-tripped VCF with the ORIGINAL VCF
-        TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, originalVCF, true);
+        TestUtils.verifyRoundTripGenotypeConcordance(vcfFromPGEN_jni, originalVCF, !writeFlags.contains(PgenWriteFlag.PRESERVE_PHASING));
+        System.out.println("Done with: " + originalVCF);
     }
 
     // ensure the PgenWriter constructor rejects attempts to use VARIANT_COUNT_UNKNOWN with PGEN_FILE_MODE_BACKWARD_SEEK file mode,
@@ -173,6 +184,7 @@ public class PgenWriteTest {
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 vcfMetaData.vcfHeader(),
                 PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK,
+                EnumSet.noneOf(PgenWriteFlag.class),
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES))
         {
             // do nothing...
@@ -193,6 +205,7 @@ public class PgenWriteTest {
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 TestUtils.createSingleSampleVCFHeader(),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY,
+                EnumSet.noneOf(PgenWriteFlag.class),
                 6, // claim we'll write 6 variants, but don't write them
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES))
         {
@@ -211,6 +224,7 @@ public class PgenWriteTest {
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 vcfMetaData.vcfHeader(),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY,
+                EnumSet.noneOf(PgenWriteFlag.class),
                 vcfMetaData.nVariants(),
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES))
         {
@@ -232,6 +246,7 @@ public class PgenWriteTest {
                     new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                     TestUtils.createSingleSampleVCFHeader(),
                     PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
+                    EnumSet.noneOf(PgenWriteFlag.class),
                     PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES);
             final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false))
         {
@@ -291,6 +306,7 @@ public class PgenWriteTest {
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 TestUtils.createSingleSampleVCFHeader(),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
+                EnumSet.noneOf(PgenWriteFlag.class),
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES);
         } catch (final PgenException e) {
             // we expect a PgenException in this test, but not from the constructor, so make sure we don't
@@ -322,6 +338,7 @@ public class PgenWriteTest {
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 vcfMetaData.vcfHeader(),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
+                EnumSet.noneOf(PgenWriteFlag.class),
                 vcfMetaData.nVariants() + 1, // add one to account for the synthetic variant that we add that gets dropped
                 ARTIFICALLY_LOW_MAX_ALLELE_THRESHOLD)) {
 
@@ -351,6 +368,7 @@ public class PgenWriteTest {
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 TestUtils.createSingleSampleVCFHeader(),
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
+                EnumSet.noneOf(PgenWriteFlag.class),
                 6,
                 // add one to plink's max to be certain we exceed the limit
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES + 1)) {
@@ -370,6 +388,7 @@ public class PgenWriteTest {
                     new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                     vcfMetaData.vcfHeader(),
                     PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
+                    EnumSet.noneOf(PgenWriteFlag.class),
                     // use VARIANT_COUNT_UNKNOWN, since otherwise we'll get an exception because we didn't write
                     // enough variants when the try-with-resources calls close on the writer
                     PgenWriter.VARIANT_COUNT_UNKNOWN, 

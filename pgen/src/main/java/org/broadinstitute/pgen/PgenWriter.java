@@ -64,10 +64,6 @@ public class PgenWriter implements VariantContextWriter {
     public static String PVAR_EXTENSION = ".pvar";
     public static String PSAM_EXTENSION = ".psam";
  
-    // If this java property is set/exists, the pgen native component will be loaded from the java.libary.path,
-    // otherwise it is assumed to be included as a resource at the top level of a jar on the classpath.
-    private static final String LOAD_PGEN_FROM_LIBRARY_PATH = "LOAD_PGEN_FROM_LIBRARY_PATH";
-
     /**
      * Enum for representing the plink2 pgen file write modes. See plink2::PgenWriteMode.
      */
@@ -91,24 +87,47 @@ public class PgenWriter implements VariantContextWriter {
         public int value() { return this.mode; }
     };
 
+    /**
+     * Enum for supported write mode flags. Must be kept in sync with pgenlib::PgenWriteFlags.
+     */
+    public enum PgenWriteFlag {
+        PRESERVE_PHASING(0x1),
+        MULTI_ALLELIC(0x2);
+
+        private final int flag;
+        private PgenWriteFlag(final int flag) { this.flag = flag; }
+        public int value() { return this.flag; }
+
+        // convert an EnumSet into corresponding bitwise/integer flags
+        public static int toIntFlags(final EnumSet<PgenWriteFlag> flagsSet) {
+            return (flagsSet.contains(PRESERVE_PHASING) ? PRESERVE_PHASING.value() : 0) |
+                   (flagsSet.contains(MULTI_ALLELIC) ? MULTI_ALLELIC.value() : 0);
+        }
+    }
+
     private HtsPath pVarFile = null;
     private HtsPath pSamFile = null;
     private final int maxAltAlleles;
     private long pgenContextHandle;
     private ByteBuffer alleleBuffer;
+    private ByteBuffer phaseBuffer;
     private VariantContextWriter pVarWriter;
     private long expectedVariantCount = 0L;
     private long droppedVariantCount = 0L;
 
     // ******************** Native JNI methods  ********************
-    private static native long openPgen(String file, int pgenWriteModeInt, long numberOfVariants, int numberOfSamples, int maxAltAlleles);
+    private static native long openPgen(String file, int pgenWriteModeInt, int writeFlags, long numberOfVariants, int numberOfSamples, int maxAltAlleles);
     private static native boolean closePgen(long pgenContextHandle, long numDroppedVariants);
     private static native long getPgenVariantCount(long pgenContextHandle);
-    private static native boolean appendAlleles(long pgenContextHandle, ByteBuffer alleles, int alleleCount);
+    private static native boolean appendAlleles(long pgenContextHandle, ByteBuffer alleles, ByteBuffer phasing, int alleleCount);
     private static native ByteBuffer createBuffer(int length);
     private static native boolean destroyByteBuffer(ByteBuffer buffer);
    // ******************** End Native JNI methods  ********************
  
+    // If this java property is set/exists, the pgen native component will be loaded from the java.libary.path,
+    // otherwise it is assumed to be included as a resource at the top level of a jar on the classpath.
+    private static final String LOAD_PGEN_FROM_LIBRARY_PATH = "LOAD_PGEN_FROM_LIBRARY_PATH";
+
     static {
         if (System.getProperty(LOAD_PGEN_FROM_LIBRARY_PATH) != null) {
             // for local testing within the IDE
@@ -132,12 +151,22 @@ public class PgenWriter implements VariantContextWriter {
      * 
      * NOTE: Currently this writer doesn't preserve genotype phasing.
      */
+    /**
+     * 
+     * @param pgenFile
+     * @param vcfHeader
+     * @param pgenWriteMode
+     * @param preservePhasing if phase information is present, preserve the phasing in the pgen. If no phase
+     * information is present in the source VCF, use false for this value.
+     * @param maxAltAlleles
+     */
     public PgenWriter(
         final HtsPath pgenFile,
         final VCFHeader vcfHeader,
         final PgenWriteMode pgenWriteMode,
+        final EnumSet<PgenWriteFlag> writeFlags,
         final int maxAltAlleles) {
-            this(pgenFile, vcfHeader, pgenWriteMode, VARIANT_COUNT_UNKNOWN, PLINK2_MAX_ALTERNATE_ALLELES);
+            this(pgenFile, vcfHeader, pgenWriteMode, writeFlags, VARIANT_COUNT_UNKNOWN, PLINK2_MAX_ALTERNATE_ALLELES);
     }
 
     /**
@@ -150,12 +179,20 @@ public class PgenWriter implements VariantContextWriter {
      * If the actual number of variants is not known at the time the constructor is called, use the value
      * {@code PgenWriter.VARIANT_COUNT_UNKNOWN} for the {@code numberOfVariants} argument.
      * 
-     * NOTE: Currently this writer doesn't preserve genotype phasing.
+     * @param pgenFile
+     * @param vcfHeader
+     * @param pgenWriteMode
+     * @param writeFlags write flags to use - if phase information is present, preserve the phasing in the pgen. If no phase
+     * information is present in the source VCF, do not set the multi-allelic value even if multi-allelics are present.
+     * @param numberOfVariants
+     * @param maxAltAlleles
+     * 
      */
     public PgenWriter(
         final HtsPath pgenFile,
         final VCFHeader vcfHeader,
         final PgenWriteMode pgenWriteMode,
+        final EnumSet<PgenWriteFlag> writeFlags,
         final long numberOfVariants,
         final int maxAltAlleles) {
 
@@ -175,11 +212,18 @@ public class PgenWriter implements VariantContextWriter {
         this.maxAltAlleles = maxAltAlleles;
         this.expectedVariantCount = numberOfVariants;
 
-        pgenContextHandle = openPgen(pgenFile.getRawInputString(), pgenWriteMode.value(), numberOfVariants, vcfHeader.getNGenotypeSamples(), maxAltAlleles);
+       pgenContextHandle = openPgen(
+            pgenFile.getRawInputString(),
+            pgenWriteMode.value(),
+            PgenWriteFlag.toIntFlags(writeFlags),
+            numberOfVariants,
+            vcfHeader.getNGenotypeSamples(),
+            maxAltAlleles);
         if (pgenContextHandle == 0) {
             //openPgen threw an async Java exception
             return;
         }
+        
         alleleBuffer = createBuffer(vcfHeader.getNGenotypeSamples() * 2 * 4); //samples * ploidy * bytes in int32_t (sizeof AlleleCode)
         if (alleleBuffer == null) {
             //createBuffer threw an async Java exception
@@ -187,6 +231,13 @@ public class PgenWriter implements VariantContextWriter {
         }
         alleleBuffer.order(ByteOrder.LITTLE_ENDIAN);
  
+        phaseBuffer = createBuffer(vcfHeader.getNGenotypeSamples());
+        if (phaseBuffer == null) {
+            //createBuffer threw an async Java exception
+            return;
+        }
+        phaseBuffer.order(ByteOrder.LITTLE_ENDIAN);
+
         // create the .pvar, and write the entire psam
         pVarFile = createPVAR(pgenFile, vcfHeader);
         pSamFile = writePSAM(pgenFile, vcfHeader);
@@ -221,6 +272,8 @@ public class PgenWriter implements VariantContextWriter {
             // we don't need to test for that here since we're only nulling out a variable on return
             destroyByteBuffer(alleleBuffer);
             alleleBuffer = null;    
+            destroyByteBuffer(phaseBuffer);
+            phaseBuffer = null;    
        }
     }
 
@@ -238,6 +291,7 @@ public class PgenWriter implements VariantContextWriter {
         
         //reset buffer
         alleleBuffer.clear();
+        phaseBuffer.clear();
         final Map<Allele, Integer> alleleMap = buildAlleleMap(vc);
      
         for (final Genotype g : vc.getGenotypes()) {
@@ -246,7 +300,14 @@ public class PgenWriter implements VariantContextWriter {
                     "PGEN only supports diploid samples and we see one with ploidy = " + g.getPloidy()
                         + " at line " + vc.toStringWithoutGenotypes());
             }
-           for (final Allele allele : g.getAlleles()) {
+
+            if (g.getAlleles().size() != 2) {
+                // TODO: add a test for this case
+                System.out.println(String.format("Allele count != 2: %d", g.getAlleles().size()));
+                throw new IllegalArgumentException(String.format("Bad allele count %d", g.getAlleles().size()));
+            }
+
+            for (final Allele allele : g.getAlleles()) {
                 final Integer mapping = alleleMap.get(allele);
                 try {
                     alleleBuffer.putInt(mapping);
@@ -262,13 +323,20 @@ public class PgenWriter implements VariantContextWriter {
                         e);
                 }
             }
+            //TODO: be smarter about bypassing phase buffer if no phase info is present
+            phaseBuffer.put(g.isPhased() ? (byte) 1 : (byte) 0);
         }
         if (alleleBuffer.position() != alleleBuffer.limit()) {
-            throw new IllegalStateException("Allele buffer is not completely filled, we have a problem. " +
+            throw new IllegalStateException("Allele buffer is not completely filled. " +
                     "Position: " + alleleBuffer.position() + " Expected " + alleleBuffer.limit());
         }
+        if (phaseBuffer.position() != phaseBuffer.limit()) {
+            throw new IllegalStateException("Phase buffer is not completely filled. " +
+                    "Position: " + phaseBuffer.position() + " Expected " + phaseBuffer.limit());
+        }
         alleleBuffer.rewind();
-        final boolean appendRet = appendAlleles(pgenContextHandle, alleleBuffer, alleleMap.size() - 1);
+        phaseBuffer.rewind();
+        final boolean appendRet = appendAlleles(pgenContextHandle, alleleBuffer, phaseBuffer, alleleMap.size() - 1);
         
         if (appendRet) {
             // only add to the pvar if appendAlleles succeeded

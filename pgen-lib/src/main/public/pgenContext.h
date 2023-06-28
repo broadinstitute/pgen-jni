@@ -29,7 +29,9 @@ namespace pgenlib {
         uint32_t sampleCount;
         uint32_t max_vrec_len;
 
+        // non-plink2 fields
+        uint32_t writeFlags; // keep track of whether the caller claims to have phasing data/multi-allelics
     } PgenContext;
-    
+
 }
 #endif //PGEN_LIB_PGENCONTEXT_H
