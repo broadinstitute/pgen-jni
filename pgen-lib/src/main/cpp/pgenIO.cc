@@ -171,6 +171,10 @@ namespace pgenlib {
 
         pGenContext->genovec = (uintptr_t *) spgw_alloc_iter;
         spgw_alloc_iter = &(spgw_alloc_iter[genovec_cacheline_ct * plink2::kCacheline]);
+        // # Can't skimp on patch_{01,10}_{set,vals} allocations even when
+        // # allele_ct_limit == 2, due to how ConvertMultiAlleleCodesUnsafe()
+        // # works.
+        // # Could skimp on dosage/phase, but that doesn't gain us much.
         pGenContext->patch_01_set = (uintptr_t*) spgw_alloc_iter;
         spgw_alloc_iter = &(spgw_alloc_iter[bitvec_cacheline_ct * plink2::kCacheline]);
         pGenContext->patch_01_vals = (plink2::AlleleCode*) spgw_alloc_iter;
@@ -179,7 +183,7 @@ namespace pgenlib {
         spgw_alloc_iter = &(spgw_alloc_iter[bitvec_cacheline_ct * plink2::kCacheline]);
         pGenContext->patch_10_vals = (plink2::AlleleCode*) spgw_alloc_iter;
 
-        // we're not using the phase info yet
+        // TODO: we're not using the phase info yet
         spgw_alloc_iter = &(spgw_alloc_iter[patch_10_vals_cacheline_ct * plink2::kCacheline]);
         pGenContext->phasepresent = (uintptr_t *) spgw_alloc_iter;
         spgw_alloc_iter = &(spgw_alloc_iter[bitvec_cacheline_ct * plink2::kCacheline]);
