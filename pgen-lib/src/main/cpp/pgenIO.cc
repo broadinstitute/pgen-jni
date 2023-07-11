@@ -13,6 +13,7 @@ namespace pgenlib {
     static const int kErrMessageBufSize = 1024;
     static plink2::PgenWriteMode validatePgenWriteMode(const uint32_t pGenWriteMode, const long variantCount);
     static plink2::PgenGlobalFlags pgenlibFlagsToPlink2Flags(const unsigned int pgenlibFlags);
+    static bool getAllPhased(const PgenContext *pGenContext, const unsigned char *phase_bytes);
 
     static PgenContext *initPgenContext(
         const char* cFilename,
@@ -178,9 +179,9 @@ namespace pgenlib {
         uint32_t patch_10_vals_cacheline_ct = plink2::DivUp(pGenContext->sampleCount * 2 * sizeof(plink2::AlleleCode), plink2::kCacheline);
         uint32_t dosage_main_cacheline_ct = plink2::DivUp(pGenContext->sampleCount, (2 * plink2::kInt32PerCacheline));
 
-        // There are two copies of pgenlib.pyx in the plink2 build, that have many differences. One uses + 3 for
+        // There are two copies of pgenlib.pyx in the plink2 build, and they have many differences. One uses + 3 for
         // this calculation, and one uses + 5. Prefer the one in src, and go with + 5.
-        // keep the pointer to the arena block in pGenContext so we can free it at the end
+        // Keep the pointer to the arena block in pGenContext so we can free it at the end.
         if (plink2::cachealigned_malloc(
                 (alloc_cacheline_ct + genovec_cacheline_ct + 5 * bitvec_cacheline_ct + patch_01_vals_cacheline_ct + patch_10_vals_cacheline_ct + dosage_main_cacheline_ct) *
                 plink2::kCacheline, &pGenContext->spgw_alloc)) {
@@ -235,21 +236,11 @@ namespace pgenlib {
      * that are ACTUALLY observed/present in allele_codes)
      */
     void appendAlleles(const PgenContext *const pGenContext, const int32_t* allele_codes, const unsigned char* phase_bytes, const int32_t allele_ct) {
-        //TODO: whats the best way to set this ?
-        bool allPhased = false;
+        // determine up front whether all the genotypes are phased so we can take the right code path through plink
+        //TODO: we could probably skip this pass through the phasing track altogether if we required the caller to
+        // could keep track of it state while assembling the phasing data, and then provide it via a parameter
+        bool allPhased = getAllPhased(pGenContext, phase_bytes);
 
-        if (pGenContext->writeFlags & kWriteFlagPreservePhasing) {
-            if (phase_bytes == nullptr) {
-                throw PgenException("Phase info is required when kWriteFlagPreservePhasing is specified");
-            }
-            uint32_t phasedCount = 0;
-            for (int i = 0; i < pGenContext->sampleCount;  i++) {
-                if (phase_bytes[i]) {
-                    phasedCount++;
-                }
-            }
-            allPhased = (phasedCount == pGenContext->sampleCount);
-        }
         uint32_t patch_01_ct;
         uint32_t patch_10_ct;
         int32_t observed_allele_ct = plink2::ConvertMultiAlleleCodesUnsafe(
@@ -447,6 +438,25 @@ namespace pgenlib {
             plinkFlags |= plink2::kfPgenGlobalHardcallPhasePresent;
         }
         return plinkFlags;
+    }
+
+    // In order to take the correct code path through plink, we need to determine up front whether all
+    // the genotypes are phased. If there is no phasing track at all, allPhased = false, but otherwise,
+    // start out assuming all are phased and then bail as soon as we find one unphased genotype.
+    bool getAllPhased(const PgenContext *pGenContext, const unsigned char *phase_bytes) {
+        bool allPhased = false;
+        if (pGenContext->writeFlags & kWriteFlagPreservePhasing) {
+            if (phase_bytes == nullptr) {
+                throw PgenException("A phasing track is required since kWriteFlagPreservePhasing was specified");
+            }
+            allPhased = true;
+            for (int i = 0; i < pGenContext->sampleCount;  i++) {
+                if (!phase_bytes[i]) {
+                    return false;
+                }
+            }
+        }
+        return allPhased;
     }
 
 /***********************************************************************************************************
