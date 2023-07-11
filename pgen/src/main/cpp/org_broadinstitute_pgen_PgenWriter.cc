@@ -34,7 +34,13 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass object,
  
     jlong pgenHandle;
     try {
-        PgenContext* const pgenContext = openPgen(cFilename, pgenWriteModeInt, static_cast<unsigned int>(writeFlags), numberOfVariants, sampleCount, maxAltAlleles);
+        PgenContext* const pgenContext = openPgen(
+            cFilename,
+            static_cast<uint32_t>(pgenWriteModeInt),
+            static_cast<uint32_t>(writeFlags),
+            numberOfVariants,
+            sampleCount,
+            maxAltAlleles);
         env->ReleaseStringUTFChars (filename, cFilename);
         pgenHandle = reinterpret_cast<jlong>(pgenContext);
     } catch (const PgenException& e) {
@@ -88,7 +94,7 @@ Java_org_broadinstitute_pgen_PgenWriter_closePgen(JNIEnv *env, jclass object, jl
     } catch (PgenMissingVariantsException &e) {
         // Don't re-throw variant count exceptions as a Java exception, since this function is called from the
         // close method of the Java writer. If the writer was created in a try-with-resources, and writing has
-        // terminated prematurely (i.e., in the course of writing the pgen another exception has *already* been
+        // terminated prematurely (i.e., in the course of writing the PGEN another exception has *already* been
         // thrown), throwing  again from the close method will cause the original exception to be suppressed.
         // So just write the message to stderr and return true.
         std::cerr << "Variant count mismatch detected on close (exception suppressed): " << e.what() << " \n";
@@ -98,7 +104,7 @@ Java_org_broadinstitute_pgen_PgenWriter_closePgen(JNIEnv *env, jclass object, jl
         // the writer can mask a previous exception if it happens in a try-with-resources, log the original
         // error to stderr before we propagate the exception.
         std::cerr << "Error ocurred in  native code during close: " << e.what();
-        reThrowAsAsyncJavaException(env, e, "Native code failure closing pgen context");
+        reThrowAsAsyncJavaException(env, e, "Native code failure closing PGEN context");
         throw e;
     } catch (PgenEmptyPgenException &e) {
         // no variants were written - an empty PGEN isn't valid, so give the caller a chance to hande/report that

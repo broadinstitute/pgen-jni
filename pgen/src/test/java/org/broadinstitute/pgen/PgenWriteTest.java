@@ -360,7 +360,7 @@ public class PgenWriteTest {
          }
     }
 
-    // verify that we reject attempts to set a max alternate allele threshold that exceeds plink2 maximum
+    // verify that we reject attempts to set a max alternate allele threshold that exceeds the plink2 maximum
     @Test(expectedExceptions = PgenException.class)
     public void testRejectRequestedMaxAltAllelesExceedsPlinkMax() throws IOException {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testRejectRequestedMaxAltAllelesExceedsPlinkMax");
@@ -373,7 +373,7 @@ public class PgenWriteTest {
                 // add one to plink's max to be certain we exceed the limit
                 PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES + 1)) {
          } catch (final PgenException e) {
-            Assert.assertTrue(e.getMessage().contains("exceeds the supported pgen max"));
+            Assert.assertTrue(e.getMessage().contains("exceeds the supported PGEN max"));
             throw e;
          }
     }

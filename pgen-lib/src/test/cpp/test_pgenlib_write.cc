@@ -26,16 +26,16 @@ long write_test_pgen(
         const int32_t* const allele_codes,
         const unsigned char* const phase_bytes,
         const int32_t allele_ct,
-        const int pgen_file_mode,
-        const unsigned int write_flags,
+        const uint32_t pgen_file_mode,
+        const uint32_t write_flags,
         const long n_variants,
         const int n_samples,
         long &writtenVariantCount);
 // integer constants to parallel PgenFileMode, for use when calling jni callable functions, which can't
 // use the PgenFileMode enum provided by plink2
-constexpr int PGEN_FILE_MODE_BACKWARD_SEEK = static_cast<int>(plink2::PgenWriteMode::kPgenWriteBackwardSeek);
-constexpr int PGEN_FILE_MODE_WRITE_SEPARATE_INDEX = static_cast<int>(plink2::PgenWriteMode::kPgenWriteSeparateIndex);
-constexpr int PGEN_FILE_MODE_WRITE_AND_COPY = static_cast<int>(plink2::PgenWriteMode::kPgenWriteAndCopy);
+constexpr uint32_t PGEN_FILE_MODE_BACKWARD_SEEK = static_cast<int>(plink2::PgenWriteMode::kPgenWriteBackwardSeek);
+constexpr uint32_t PGEN_FILE_MODE_WRITE_SEPARATE_INDEX = static_cast<int>(plink2::PgenWriteMode::kPgenWriteSeparateIndex);
+constexpr uint32_t PGEN_FILE_MODE_WRITE_AND_COPY = static_cast<int>(plink2::PgenWriteMode::kPgenWriteAndCopy);
 
 //******************* Tests *******************
 
@@ -64,7 +64,7 @@ BOOST_AUTO_TEST_CASE(test_pglerr_string_conversion) {
 }
 
 // write a small, bi-allelic pgen file, once with each possible file write mode
-constexpr boost::array<int, 3> s_pgenFileMode {
+constexpr boost::array<uint32_t, 3> s_pgenFileMode {
     PGEN_FILE_MODE_BACKWARD_SEEK,
     PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
     PGEN_FILE_MODE_WRITE_AND_COPY
@@ -95,7 +95,7 @@ BOOST_AUTO_TEST_CASE(test_unphased_biallelic_large) {
     const long file_size = write_test_pgen(allele_codes, nullptr,n_alleles,PGEN_FILE_MODE_WRITE_AND_COPY, 0, n_variants, n_samples, variantCount);
     delete[] allele_codes;
 
-    //BOOST_REQUIRE_EQUAL(file_size, 125450028); // cause thats what it is
+    BOOST_REQUIRE_EQUAL(file_size, 125450028); // cause thats what it is
     BOOST_REQUIRE_EQUAL(variantCount, n_variants);
 }
 
@@ -111,7 +111,7 @@ BOOST_AUTO_TEST_CASE(test_unphased_multi_allelic_large) {
     const long file_size = write_test_pgen(allele_codes, nullptr, n_alleles,PGEN_FILE_MODE_WRITE_AND_COPY, 0, n_variants, n_samples, variantCount);
     delete[] allele_codes;
 
-    //BOOST_REQUIRE_EQUAL(file_size, 911252530); // cause thats what it is
+    BOOST_REQUIRE_EQUAL(file_size, 911252530); // cause thats what it is
     BOOST_REQUIRE_EQUAL(variantCount, n_variants);
 }
 
@@ -123,7 +123,6 @@ BOOST_AUTO_TEST_CASE(test_biallelic_one_allele_not_observed) {
     // one variants's worth of allele codes - drawn from 2 alleles over 3 samples, but with only one
     // allele actually observed
     constexpr int32_t allele_codes[] {0, 0, 0, 0, 0, 0 };
-//    constexpr unsigned char phase_bytes[] { (unsigned char) 0, (unsigned char) 0, (unsigned char) 0 };
     long variantCount = 0L;
     write_test_pgen(allele_codes, nullptr, n_alleles, PGEN_FILE_MODE_WRITE_AND_COPY, 0, n_variants, n_samples, variantCount);
 }
@@ -136,7 +135,6 @@ BOOST_AUTO_TEST_CASE(test_multiallelic_some_alleles_not_observed) {
     // one variants's worth of allele codes - drawn from 7 alleles over 3 samples, but with only 3
     // alleles actually observed
     constexpr int32_t allele_codes[] {0, 1, 0, 5, 0, 4 };
-//    constexpr unsigned char phase_bytes[] { (unsigned char) 0, (unsigned char) 0, (unsigned char) 0 };
     long variantCount = 0L;
     write_test_pgen(allele_codes, nullptr, n_alleles, PGEN_FILE_MODE_WRITE_AND_COPY, 0, n_variants, n_samples, variantCount);
 }
@@ -203,7 +201,6 @@ BOOST_AUTO_TEST_CASE(test_close_too_few_writes_known_variant_count) {
     BOOST_REQUIRE_NE(pgenContext, nullptr);
     unlink(tmpFileName);
     int32_t *allele_codes = new int32_t[n_samples * 2]{0};
-//    unsigned char *phase_bytes = new unsigned char[n_samples]{(unsigned char) 0};
     pgenlib::appendAlleles(pgenContext, allele_codes, nullptr, 2);
     BOOST_REQUIRE_EXCEPTION(
             closePgen(pgenContext, 0),
@@ -213,7 +210,6 @@ BOOST_AUTO_TEST_CASE(test_close_too_few_writes_known_variant_count) {
             }
     );
     delete[] allele_codes;
-//    delete[] phase_bytes;
 }
 
 // claim that we're going to write 10 variants, but only write 1
@@ -350,14 +346,14 @@ void createTempFile(const char* const nameTemplate, char (&outputFileName)[N]) {
     close(fDesc);
 }
 
-// write a (unphased) pGEN file given allele codes (the same allele code vector is used for each variant),
-// given # of variants, # of samples, and write mode
+// write a PGEN file given allele codes (the same allele code vector is used for each variant) and phase_bytes
+// (may be null), # of variants, # of samples, and write mode
 long write_test_pgen(
         const int32_t *allele_codes,
         const unsigned char *phase_bytes,
         const int32_t allele_ct,
-        const int pgen_file_mode,
-        const unsigned int writeFlags,
+        const uint32_t pgen_file_mode,
+        const uint32_t writeFlags,
         const long n_variants,
         const int n_samples,
         long &variantCount) {

@@ -2,7 +2,6 @@
  * Copyright (c) 2023, Broad Institute, Inc. All rights reserved.
  */
 
-
 package org.broadinstitute.pgen;
 
 import htsjdk.io.HtsPath;
@@ -37,16 +36,16 @@ import java.util.Map;
  * [spec](https://github.com/chrchang/plink-ng/tree/master/pgen_spec) for more information about the PGEN file format.
  * 
  * The writer implementation uses an underlying native component, which is built from a combination of local source files,
- * plus some source files taken directly from the plink2 (that are used by plink2 to build the pgen-lib target). Only
- * specific platforms are supported.
+ * plus some source files taken directly from the plink2 (that are used by plink2 to build the pgenlib target). Only
+ * some platforms are supported (macos and linux intel platforms).
 */
 public class PgenWriter implements VariantContextWriter {
     private static Log logger = Log.getInstance(PgenWriter.class);
 
     /**
-     * A sentinel to signal that the number of variants is unknown. This value can be used as a variant count in the
-     * pgen-lib APIs when the variant count is not known up front, as long as the corresponding file mode param is
-     * not PGEN_FILE_MODE_BACKWARD_SEEK (PGEN_FILE_MODE_BACKWARD_SEEK requires an accurate variant count).
+     * variant count is not known up front, as long as the corresponding file mode param used is either {@code #PGEN_FILE_MODE_WRITE_SEPARATE_INDEX}
+     * or {@code #PGEN_FILE_MODE_WRITE_AND_COPY} (the write mode must not be {@link #PGEN_FILE_MODE_BACKWARD_SEEK}, which requires an accurate
+     * upfront variant count).
      */
     public static long VARIANT_COUNT_UNKNOWN = 0x7ffffffd; // plink2::kPglMaxVariantCt
 
@@ -55,7 +54,7 @@ public class PgenWriter implements VariantContextWriter {
      */
     public static final int PLINK2_NO_CALL_VALUE = -9;
     /**
-     * The maximum number of alternate alleles that plink2/pgen can handle (this is defined by plink2)
+     * The maximum number of alternate alleles that plink2/PGEN can handle (this is determined/defined by plink2)
      */
     public static final int PLINK2_MAX_ALTERNATE_ALLELES = 254;  // plink2::kPglMaxAltAlleleCt
 
@@ -65,41 +64,46 @@ public class PgenWriter implements VariantContextWriter {
     public static String PSAM_EXTENSION = ".psam";
  
     /**
-     * Enum for representing the plink2 pgen file write modes. See plink2::PgenWriteMode.
+     * Enum for representing the plink2 PGEN file write modes. See plink2::PgenWriteMode.
      */
     public enum PgenWriteMode {
         /**
-         * requires backward seeks when writing
+         * write the pgen in single pass; requires backward seeks when writing; can only be used when an accurate upfront variant count
+         * is provided to the {@link PgenWriter}
          */
-        PGEN_FILE_MODE_BACKWARD_SEEK(0),
+        PGEN_FILE_MODE_BACKWARD_SEEK(0),        // plink2::PgenWriteMode::kPgenWriteBackwardSeek
         /**
          * write a separate .pgi index file
          */
-        PGEN_FILE_MODE_WRITE_SEPARATE_INDEX(1),
+        PGEN_FILE_MODE_WRITE_SEPARATE_INDEX(1), // plink2::PgenWriteMode::kPgenWriteSeparateIndex
         /**
          * the final real .pgen is only created at the end, by writing the index and then appending the body of the first
          * temporary .pgen (which is then deleted).
          */
-        PGEN_FILE_MODE_WRITE_AND_COPY(2); 
-
+        PGEN_FILE_MODE_WRITE_AND_COPY(2);       // plink2::PgenWriteMode::kPgenWriteAndCopy
+ 
         private final int mode;
         private PgenWriteMode(final int mode) { this.mode = mode; }
         public int value() { return this.mode; }
     };
 
     /**
-     * Enum for supported write mode flags. Must be kept in sync with pgenlib::PgenWriteFlags.
+     * Enum for supported write mode flags.
      */
     public enum PgenWriteFlag {
-        PRESERVE_PHASING(0x1),
-        MULTI_ALLELIC(0x2);
+        // This enum, and the corresponding enum values must be kept in sync with the corresponding constants
+        // in pgenlib::PgenWriteFlags.
+        PRESERVE_PHASING(0x1),  // pgenlib::kWriteFlagPreservePhasing
+        MULTI_ALLELIC(0x2);     // pgenlib::kWriteFlagMultiAllelic
 
         private final int flag;
         private PgenWriteFlag(final int flag) { this.flag = flag; }
         public int value() { return this.flag; }
 
-        // convert an EnumSet into corresponding bitwise/integer flags
-        public static int toIntFlags(final EnumSet<PgenWriteFlag> flagsSet) {
+        /**
+         * Convert an EnumSet<PgenWriteFlag> into the corresponding pgenlib bitwise/integer flags.
+         */
+        private static int toIntFlags(final EnumSet<PgenWriteFlag> flagsSet) {
             return (flagsSet.contains(PRESERVE_PHASING) ? PRESERVE_PHASING.value() : 0) |
                    (flagsSet.contains(MULTI_ALLELIC) ? MULTI_ALLELIC.value() : 0);
         }
@@ -124,10 +128,9 @@ public class PgenWriter implements VariantContextWriter {
     private static native boolean destroyByteBuffer(ByteBuffer buffer);
    // ******************** End Native JNI methods  ********************
  
-    // If this java property is set/exists, the pgen native component will be loaded from the java.libary.path,
+    // If this java property is set/exists, the native PGEN writer component will be loaded from java.libary.path,
     // otherwise it is assumed to be included as a resource at the top level of a jar on the classpath.
     private static final String LOAD_PGEN_FROM_LIBRARY_PATH = "LOAD_PGEN_FROM_LIBRARY_PATH";
-
     static {
         if (System.getProperty(LOAD_PGEN_FROM_LIBRARY_PATH) != null) {
             // for local testing within the IDE
@@ -143,69 +146,65 @@ public class PgenWriter implements VariantContextWriter {
     }
  
     /**
-     * Create a PGEN writer. The writer creats a PGEN file set (.pgen and .pvar/.psam files). Depending on the file
-     * mode used, may also create a .pgen.pgi file.
+     * Create a PGEN writer for writing VariantContext objects to a Plink2 PGEN file. The writer creates a set of related PGEN
+     * files (.pgen/.pvar/.psam files). Depending on the {@link #PgenWriteMode} specified, may also create a .pgen.pgi file,
+     * or temporary/intermediate files.
      * 
-     * Supports only diploid sites with fewer than {@code PLINK2_MAX_ALTERNATE_ALLELES} (this value can be
-     * furhter limited using {@code maxAltAlleles}. Sites that exceed this number are silently dropped.
+     * Supports only diploid sites with fewer than {@link #PLINK2_MAX_ALTERNATE_ALLELES} (this value can be further limited using
+     * {@code maxAltAlleles}). Sites that exceed the maximum number of alternate alleles are silently dropped.
      * 
-     * NOTE: Currently this writer doesn't preserve genotype phasing.
-     */
-    /**
-     * 
-     * @param pgenFile
-     * @param vcfHeader
-     * @param pgenWriteMode
-     * @param preservePhasing if phase information is present, preserve the phasing in the pgen. If no phase
-     * information is present in the source VCF, use false for this value.
-     * @param maxAltAlleles
+     * @param pgenFileName the name of the PGEN file to be created (must have a ".pgen" suffix)
+     * @param vcfHeader a valid VCF header for to use to create the pgen/pvar/psam files
+     * @param pgenWriteMode the PGEN write mode to use (see {@link PgenWriteMode})
+     * @param writeFlags the write flags to use - see {@link #PgenWriteFlag}. If phase information is present for the source genotypes, include
+     * the {@link PgenWriteFlag#PRESERVE_PHASING} flag. If multi allelic variants are present, include the {@link PgenWriteFlag#MULTI_ALLELIC} flag.
+     * @param maxAltAlleles the maximum number of alternate alleles to consider; site with more alterate alleles than this value will be
+     * silently dropped
      */
     public PgenWriter(
-        final HtsPath pgenFile,
+        final HtsPath pgenFileName,
         final VCFHeader vcfHeader,
         final PgenWriteMode pgenWriteMode,
         final EnumSet<PgenWriteFlag> writeFlags,
         final int maxAltAlleles) {
-            this(pgenFile, vcfHeader, pgenWriteMode, writeFlags, VARIANT_COUNT_UNKNOWN, PLINK2_MAX_ALTERNATE_ALLELES);
+            this(pgenFileName, vcfHeader, pgenWriteMode, writeFlags, VARIANT_COUNT_UNKNOWN, PLINK2_MAX_ALTERNATE_ALLELES);
     }
 
     /**
-     * Create a PGEN writer. The writer creats a PGEN file set (.pgen and .pvar/.psam files). Depending on the file
-     * mode used, may also create a .pgen.pgi file.
+     * Create a PGEN writer for writing VariantContexts to a Plink2 PGEN file. The writer creates a set of related PGEN files (.pgen and
+     * .pvar/.psam files). Depending on the {@link #PgenWriteMode} specified, may also create a .pgen.pgi file.
      * 
-     * Supports only diploid sites with fewer than {@code PLINK2_MAX_ALTERNATE_ALLELES} (this value can be
-     * furhter limited using {@code maxAltAlleles}. Sites that exceed this number are silently dropped.
+     * Supports only diploid sites with fewer than {@link #PLINK2_MAX_ALTERNATE_ALLELES} (this value can be further limited using
+     * {@code maxAltAlleles}. Sites that exceed the maximum number of alternate alleles are silently dropped.
      * 
-     * If the actual number of variants is not known at the time the constructor is called, use the value
-     * {@code PgenWriter.VARIANT_COUNT_UNKNOWN} for the {@code numberOfVariants} argument.
-     * 
-     * @param pgenFile
-     * @param vcfHeader
-     * @param pgenWriteMode
-     * @param writeFlags write flags to use - if phase information is present, preserve the phasing in the pgen. If no phase
-     * information is present in the source VCF, do not set the multi-allelic value even if multi-allelics are present.
-     * @param numberOfVariants
-     * @param maxAltAlleles
-     * 
+     * @param pgenFileName the name of the PGEN file to be created (must end in .pgen)
+     * @param vcfHeader a valid VCF header to use to create the PGEN
+     * @param pgenWriteMode the pgen write mode to use (see {@link PgenWriteMode#})
+     * @param writeFlags the write flags to use - see {@link #PgenWriteFlag}. If phase information is present for the source genotypes, include
+     * the {@link PgenWriteFlag#PRESERVE_PHASING} flag. If multi allelic variants are present, include the {@link PgenWriteFlag#MULTI_ALLELIC} flag.
+     * @param numberOfVariants the number of variants to be written. if the number is unknown, use the sentinel value {@link PgenWriter#VARIANT_COUNT_UNKNOWN},
+     * but doing so precludes the use of the PGEN write mode {@link PgenWriteMode#PGEN_FILE_MODE_BACKWARD_SEEK}
+     * @param maxAltAlleles the maximum number of alternate alleles to consider; site with more alterate alleles than this value will be
+     * silently dropped
      */
     public PgenWriter(
-        final HtsPath pgenFile,
+        final HtsPath pgenFileName,
         final VCFHeader vcfHeader,
         final PgenWriteMode pgenWriteMode,
         final EnumSet<PgenWriteFlag> writeFlags,
         final long numberOfVariants,
         final int maxAltAlleles) {
 
-        if (!pgenFile.hasExtension(PGEN_EXTENSION)) {
+        if (!pgenFileName.hasExtension(PGEN_EXTENSION)) {
             throw new PgenException(
-                String.format("Invalid pgen file name: %s. pgen files must use the .pgen extension", pgenFile.getRawInputString()));
+                String.format("Invalid PGEN file name: %s. PGEN files must use the .pgen extension", pgenFileName.getRawInputString()));
         }
-        if (!pgenFile.getScheme().equals("file")) {
-            throw new PgenException(String.format("Invalid pgen file name: %s. pgen files must be local files", pgenFile));
+        if (!pgenFileName.getScheme().equals("file")) {
+            throw new PgenException(String.format("Invalid PGEN file name: %s. PGEN files must be local files", pgenFileName));
         }
         if (maxAltAlleles > PLINK2_MAX_ALTERNATE_ALLELES) {
             throw new PgenException(
-                String.format("Requested max alternate alleles of (%d) exceeds the supported pgen max of (%d)",
+                String.format("Requested max alternate alleles of (%d) exceeds the supported PGEN max of (%d)",
                     maxAltAlleles,
                     PLINK2_MAX_ALTERNATE_ALLELES));
         }
@@ -213,7 +212,7 @@ public class PgenWriter implements VariantContextWriter {
         this.expectedVariantCount = numberOfVariants;
 
        pgenContextHandle = openPgen(
-            pgenFile.getRawInputString(),
+            pgenFileName.getRawInputString(),
             pgenWriteMode.value(),
             PgenWriteFlag.toIntFlags(writeFlags),
             numberOfVariants,
@@ -239,8 +238,8 @@ public class PgenWriter implements VariantContextWriter {
         phaseBuffer.order(ByteOrder.LITTLE_ENDIAN);
 
         // create the .pvar, and write the entire psam
-        pVarFile = createPVAR(pgenFile, vcfHeader);
-        pSamFile = writePSAM(pgenFile, vcfHeader);
+        pVarFile = createPVAR(pgenFileName, vcfHeader);
+        pSamFile = writePSAM(pgenFileName, vcfHeader);
     }
 
     @Override
@@ -297,8 +296,9 @@ public class PgenWriter implements VariantContextWriter {
         for (final Genotype g : vc.getGenotypes()) {
             if (g.getPloidy() != 2) {
                 throw new PgenException(
-                    "PGEN only supports diploid samples and we see one with ploidy = " + g.getPloidy()
-                        + " at line " + vc.toStringWithoutGenotypes());
+                    String.format("PGEN only supports diploid samples but a sample with ploidy = %d was found at variant %s",
+                        g.getPloidy(),
+                        vc.toStringWithoutGenotypes()));
             }
 
             if (g.getAlleles().size() != 2) {
@@ -323,23 +323,26 @@ public class PgenWriter implements VariantContextWriter {
                         e);
                 }
             }
-            //TODO: be smarter about bypassing phase buffer if no phase info is present
             phaseBuffer.put(g.isPhased() ? (byte) 1 : (byte) 0);
         }
         if (alleleBuffer.position() != alleleBuffer.limit()) {
-            throw new IllegalStateException("Allele buffer is not completely filled. " +
-                    "Position: " + alleleBuffer.position() + " Expected " + alleleBuffer.limit());
+            throw new IllegalStateException(
+                String.format("Allele buffer is not completely filled, position is %d but expected %d.",
+                    alleleBuffer.position(),
+                    alleleBuffer.limit()));
         }
         if (phaseBuffer.position() != phaseBuffer.limit()) {
-            throw new IllegalStateException("Phase buffer is not completely filled. " +
-                    "Position: " + phaseBuffer.position() + " Expected " + phaseBuffer.limit());
+            throw new IllegalStateException(
+                String.format("Phase buffer is not completely filled, position is %d but expected %d.",
+                    phaseBuffer.position(),
+                    phaseBuffer.limit()));
         }
+
         alleleBuffer.rewind();
         phaseBuffer.rewind();
         final boolean appendRet = appendAlleles(pgenContextHandle, alleleBuffer, phaseBuffer, alleleMap.size() - 1);
         
-        if (appendRet) {
-            // only add to the pvar if appendAlleles succeeded
+        if (appendRet) { // only add to the pvar if appendAlleles succeeded
             pVarWriter.add(vc);
         }
     }
@@ -350,9 +353,9 @@ public class PgenWriter implements VariantContextWriter {
     public long getDroppedVariantCount() { return droppedVariantCount; }
 
      /**
-     * @return the number of variants actually written to the pgen
+     * @return the number of variants actually written to the PGEN
      * 
-     * Delegates to the pgen-lib code to get the actual number recorded by the pgen library code.
+     * Delegates to the pgenlib code to get the actual number recorded by the pgen library code.
      */
     public long getWrittenVariantCount() { return getPgenVariantCount(pgenContextHandle); }
 
@@ -384,7 +387,7 @@ public class PgenWriter implements VariantContextWriter {
     }
 
     /**
-     * Create and writes a .psam companion file for {@code pgenFile}.
+     * Creates writes a .psam companion file for {@code pgenFile}.
      */
     private HtsPath writePSAM(final HtsPath pgenFile, final VCFHeader vcfHeader) {
         final String PSAM_HEADER_LINE = "#IID\tSEX\n";
@@ -397,10 +400,9 @@ public class PgenWriter implements VariantContextWriter {
                         .toAbsolutePath().toString());
         try (final BufferedWriter psamWriter = Files.newBufferedWriter(pSamFile.toPath())) {
             psamWriter.append(PSAM_HEADER_LINE);
-            // Sample name order matters here. I don't see any spec for the psam or pvar, but if you use plink2 to crecrate a VCF
-            // from a pgen file set, it appears to use the order of the samples in the .psam as the basis for linking the genotypes
-            // in the pgen back to the VCF. So if we don't preserve the order in the .psam, the genotypes in the roundtripped VCF
-            // won't match the original VCF (and will be incorrect).
+            // Sample name order matters here. If you use plink2 to create a VCF from a PGEN file set, it appears to use the order of the samples in
+            // the .psam as the basis for linking the genotypes in the PGEN back to the VCF samples. So if we don't preserve the order in the .psam,
+            // the genotypes in the roundtripped VCF won't match the original VCF, and will be incorrect.
             for (final String sampleName : vcfHeader.getGenotypeSamples()) {
                 psamWriter.write(sampleName);
                 psamWriter.write(PSAM_DETAIL_LINE);
