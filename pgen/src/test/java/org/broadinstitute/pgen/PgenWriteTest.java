@@ -124,11 +124,7 @@ public class PgenWriteTest {
             { Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
  
             // multiallelic, partially phase (phasing synthesized by randomly mutating the genotypes in 0000000000-my_demo_filters.vcf.gz)
-            { Paths.get("testdata/0000000000-my_demo_filters.partiallyphased.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26",
-                    EnumSet.of(PgenWriteFlag.MULTI_ALLELIC, PgenWriteFlag.PRESERVE_PHASING)
-                    //EnumSet.of(PgenWriteFlag.PRESERVE_PHASING)
-                    //EnumSet.noneOf(PgenWriteFlag.class)
-            },
+            { Paths.get("testdata/0000000000-my_demo_filters.partiallyphased.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.of(PgenWriteFlag.MULTI_ALLELIC, PgenWriteFlag.PRESERVE_PHASING) },
 
             // temporary/local test cases
             // { Paths.get("testdata/external/0000000009-NHGRI_AnVIL_3K.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
@@ -153,10 +149,9 @@ public class PgenWriteTest {
         final TestUtils.PgenFileSet jniFileSet = TestUtils.vcfToPgen_jni(originalVCF, pgenWriteMode, useTrueVariantCount, writeFlags);
         final TestUtils.PgenFileSet plink2FileSet = TestUtils.vcfToPgen_plink2(originalVCF);
 
-        // now use plink2 to validate both of the generated pgen file sets
+        // while we're at it, run plink2 --validate on the outputs
+        // but only if write mode != kPgenWriteSeparateIndex, since that causes plink2 to say the pgen file is corrupt 
         if (pgenWriteMode != PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX) {
-            // while we're at it, run plink2 --pgen-diff on the outputs
-            // but only if write mode != kPgenWriteSeparateIndex, since that causes plink2 to say the pgen file is corrupt 
             TestUtils.validatePgen_plink2(jniFileSet);
             TestUtils.validatePgen_plink2(plink2FileSet);
         }
