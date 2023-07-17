@@ -302,9 +302,7 @@ public class PgenWriter implements VariantContextWriter {
             }
 
             if (g.getAlleles().size() != 2) {
-                // TODO: add a test for this case
-                System.out.println(String.format("Allele count != 2: %d", g.getAlleles().size()));
-                throw new IllegalArgumentException(String.format("Bad allele count %d", g.getAlleles().size()));
+                throw new IllegalArgumentException(String.format("Bad allele count in genotype %d", g.getAlleles().size()));
             }
 
             for (final Allele allele : g.getAlleles()) {

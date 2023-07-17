@@ -81,9 +81,9 @@ public class PgenWriteTest {
             //  3) Using plink2 to diff the pgen-jni-generated PGEN with the plink2-generated PGEN, verifying
             //     that no differences are reported.
             //  4) Using plink2 to regenerate VCFs from the two generated PGENs, and then:
-            //      a) running a concordance test to validate that the VCF generated from the pgen-jni-generated PGEN is equivalent
-            //         to the VCF generated from the plink2-generated PGEN
-            //      b) running a concordance test to validate that the pgen-jni-generated VCF is equivalent to the original test VCF
+            //      a) running a concordance test to validate that the VCF generated from the pgen-jni-generated PGEN is concordant
+            //          with the VCF generated from the plink2-generated PGEN
+            //      b) running a concordance test to validate that the pgen-jni-generated VCF is concordant with the original test VCF
             //
             // Since plink2 doesn't respect the chromosome names contained in the PGEN's companion PVAR when generating VCFs,
             // and instead generates names using one of several predefined schemes identified by codes that can be provided
@@ -91,8 +91,7 @@ public class PgenWriteTest {
             // "--output-chr" argument in order to make the subsequent VCF comparison to the original succeed. See
             // https://www.cog-genomics.org/plink/2.0/data#irreg_output.
 
-            // format
-            // file name, write mode, use true variant count, extra plink args, write flags
+            // provider structure: file name, write mode, use true variant count, extra plink args, write flags
             
             // small, all bi-allelic, unphased (6 variants/3 samples), test once for each write mode, and for write mode != PGEN_FILE_MODE_BACKWARD_SEEK,
             // also test with variant count provided up front or not (PGEN_FILE_MODE_BACKWARD_SEEK always requires an acccurate variant count)
@@ -124,7 +123,12 @@ public class PgenWriteTest {
             { Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
             { Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
  
-            // TODO: add multi-allelic AND phased tests
+            // multiallelic, partially phase (phasing synthesized by randomly mutating the genotypes in 0000000000-my_demo_filters.vcf.gz)
+            { Paths.get("testdata/0000000000-my_demo_filters.partiallyphased.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26",
+                    EnumSet.of(PgenWriteFlag.MULTI_ALLELIC, PgenWriteFlag.PRESERVE_PHASING)
+                    //EnumSet.of(PgenWriteFlag.PRESERVE_PHASING)
+                    //EnumSet.noneOf(PgenWriteFlag.class)
+            },
 
             // temporary/local test cases
             // { Paths.get("testdata/external/0000000009-NHGRI_AnVIL_3K.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },

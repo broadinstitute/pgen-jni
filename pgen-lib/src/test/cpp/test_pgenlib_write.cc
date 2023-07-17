@@ -99,7 +99,7 @@ BOOST_AUTO_TEST_CASE(test_unphased_biallelic_large) {
     BOOST_REQUIRE_EQUAL(variantCount, n_variants);
 }
 
-// write a larger, multi-allelic pgen, using only file mode PGEN_FILE_MODE_WRITE_AND_COPY
+// write a larger, multi-allelic, unphased pgen, using only file mode PGEN_FILE_MODE_WRITE_AND_COPY
 BOOST_AUTO_TEST_CASE(test_unphased_multi_allelic_large) {
     constexpr long n_variants = 100000L;
     constexpr int n_samples = 10000;
@@ -115,7 +115,36 @@ BOOST_AUTO_TEST_CASE(test_unphased_multi_allelic_large) {
     BOOST_REQUIRE_EQUAL(variantCount, n_variants);
 }
 
-// verify the issue described here: https://groups.google.com/g/plink2-users/c/Sn5qVCyDlDw/m/GOWScY6tAQAJ for bi-allelics
+// write a larger, multi-allelic, phased pgen, using only file mode PGEN_FILE_MODE_WRITE_AND_COPY
+BOOST_AUTO_TEST_CASE(test_phased_multi_allelic_large) {
+    constexpr long n_variants = 100000L;
+    constexpr int n_samples = 10000;
+    constexpr int n_alleles = 7;
+    // synthesize one variants's worth of allele codes, with genotypes randomly drawn from 7 allele codes
+    int32_t *allele_codes = new int32_t[n_samples * 2];
+    generate_allele_code_distribution(allele_codes, n_samples, n_alleles);
+    unsigned char *phase_bytes = new unsigned char[n_samples];
+    for (int i = 0; i < n_samples; i++) {
+        phase_bytes[i] = (unsigned char) 0x1;
+    }
+    long variantCount = 0L;
+    const long file_size = write_test_pgen(
+            allele_codes,
+            phase_bytes,
+            n_alleles,
+            PGEN_FILE_MODE_WRITE_AND_COPY,
+            pgenlib::kWriteFlagMultiAllelic | pgenlib::kWriteFlagPreservePhasing,
+            n_variants,
+            n_samples,
+            variantCount);
+    delete[] allele_codes;
+    delete[] phase_bytes;
+
+//    BOOST_REQUIRE_EQUAL(file_size, 911252530); // cause thats what it is
+    BOOST_REQUIRE_EQUAL(variantCount, n_variants);
+}
+
+// verify that the issue described here is fixed: https://groups.google.com/g/plink2-users/c/Sn5qVCyDlDw/m/GOWScY6tAQAJ for bi-allelics
 BOOST_AUTO_TEST_CASE(test_biallelic_one_allele_not_observed) {
     constexpr long n_variants = 6;
     constexpr int n_samples = 3;
