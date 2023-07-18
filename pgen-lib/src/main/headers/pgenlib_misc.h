@@ -112,6 +112,15 @@ HEADER_INLINE uintptr_t AlleleCodeCtToAlignedWordCt(uintptr_t val) {
   return kWordsPerVec * AlleleCodeCtToVecCt(val);
 }
 
+HEADER_INLINE AlleleCode* DowncastWToAC(uintptr_t* pp) {
+  return R_CAST(AlleleCode*, pp);
+}
+
+HEADER_INLINE void AlignACToVec(AlleleCode** pp) {
+  const uintptr_t addr = R_CAST(uintptr_t, *pp);
+  *pp = R_CAST(AlleleCode*, RoundUpPow2(addr, kBytesPerVec));
+}
+
 // returns a word with low bit in each pair set at each 00.
 HEADER_INLINE uintptr_t Word00(uintptr_t ww) {
   return (~(ww | (ww >> 1))) & kMask5555;
@@ -176,7 +185,7 @@ void CopyNyparrNonemptySubset(const uintptr_t* __restrict raw_nyparr, const uint
 
 // Copies a bit from raw_bitarr for each genoarr entry matching match_word.
 // (match_word must be a multiple of kMask5555.)
-void CopyGenomatchSubset(const uintptr_t* __restrict raw_bitarr, const uintptr_t* __restrict genoarr, uintptr_t match_word, uint32_t write_bit_idx_start, uint32_t bit_ct, uintptr_t* __restrict output_bitarr);
+void CopyGenomatchSubset(const uintptr_t* __restrict raw_bitarr, const uintptr_t* __restrict genoarr, uintptr_t match_word, uint32_t write_bit_idx_start, uint32_t bit_ct, void* __restrict output);
 
 void ExpandBytearrFromGenoarr(const void* __restrict compact_bitarr, const uintptr_t* __restrict genoarr, uintptr_t match_word, uint32_t genoword_ct, uint32_t expand_size, uint32_t read_start_bit, uintptr_t* __restrict target);
 
@@ -185,7 +194,7 @@ void ExpandBytearrFromGenoarr(const void* __restrict compact_bitarr, const uintp
 // genovec/genoarr word are zeroed out.
 void GenovecCount12Unsafe(const uintptr_t* genovec, uint32_t sample_ct, uint32_t* __restrict raw_01_ctp, uint32_t* __restrict raw_10_ctp);
 
-void Count3FreqVec6(const VecW* geno_vvec, uint32_t vec_ct, uint32_t* __restrict even_ctp, uint32_t* __restrict odd_ctp, uint32_t* __restrict bothset_ctp);
+void Count3FreqVec6(const void* geno_vvec, uint32_t vec_ct, uint32_t* __restrict even_ctp, uint32_t* __restrict odd_ctp, uint32_t* __restrict bothset_ctp);
 
 // vector-alignment preferred.
 void GenoarrCountFreqsUnsafe(const uintptr_t* genoarr, uint32_t sample_ct, STD_ARRAY_REF(uint32_t, 4) genocounts);
@@ -194,8 +203,7 @@ void GenoarrCountFreqsUnsafe(const uintptr_t* genoarr, uint32_t sample_ct, STD_A
 // breaking ties in favor of the lower value.
 uintptr_t MostCommonGenoUnsafe(const uintptr_t* genoarr, uint32_t sample_ct);
 
-// geno_vvec now allowed to be unaligned.
-void CountSubset3FreqVec6(const VecW* __restrict geno_vvec, const VecW* __restrict interleaved_mask_vvec, uint32_t vec_ct, uint32_t* __restrict even_ctp, uint32_t* __restrict odd_ctp, uint32_t* __restrict bothset_ctp);
+void CountSubset3FreqVec6(const void* __restrict genoarr, const VecW* __restrict interleaved_mask_vvec, uint32_t vec_ct, uint32_t* __restrict even_ctp, uint32_t* __restrict odd_ctp, uint32_t* __restrict bothset_ctp);
 
 // genoarr vector-alignment preferred.
 void GenoarrCountSubsetFreqs(const uintptr_t* __restrict genoarr, const uintptr_t* __restrict sample_include_interleaved_vec, uint32_t raw_sample_ct, uint32_t sample_ct, STD_ARRAY_REF(uint32_t, 4) genocounts);
@@ -343,6 +351,7 @@ CONSTI32(kPglNypTransposeWords, kWordsPerCacheline);
 #ifdef __LP64__
 CONSTI32(kPglNypTransposeBufbytes, (kPglNypTransposeBatch * kPglNypTransposeBatch) / 2);
 
+// buf0 and buf1 assumed to be vector-aligned.
 void TransposeNypblock64(const uintptr_t* read_iter, uint32_t read_ul_stride, uint32_t write_ul_stride, uint32_t read_batch_size, uint32_t write_batch_size, uintptr_t* __restrict write_iter, unsigned char* __restrict buf0, unsigned char* __restrict buf1);
 #else  // !__LP64__
 CONSTI32(kPglNypTransposeBufbytes, (kPglNypTransposeBatch * kPglNypTransposeBatch) / 2);
@@ -361,9 +370,9 @@ CONSTI32(kPglNypTransposeBufwords, kPglNypTransposeBufbytes / kBytesPerWord);
 HEADER_INLINE void TransposeNypblock(const uintptr_t* read_iter, uint32_t read_ul_stride, uint32_t write_ul_stride, uint32_t read_batch_size, uint32_t write_batch_size, uintptr_t* write_iter, VecW* vecaligned_buf) {
 #ifdef __LP64__
   // assert(!(write_ul_stride % 2));
-  TransposeNypblock64(read_iter, read_ul_stride, write_ul_stride, read_batch_size, write_batch_size, write_iter, R_CAST(unsigned char*, vecaligned_buf), &(R_CAST(unsigned char*, vecaligned_buf)[kPglNypTransposeBufbytes / 2]));
+  TransposeNypblock64(read_iter, read_ul_stride, write_ul_stride, read_batch_size, write_batch_size, write_iter, DowncastToUc(vecaligned_buf), &(DowncastToUc(vecaligned_buf)[kPglNypTransposeBufbytes / 2]));
 #else
-  TransposeNypblock32(read_iter, read_ul_stride, write_ul_stride, read_batch_size, write_batch_size, write_iter, R_CAST(unsigned char*, vecaligned_buf), &(R_CAST(unsigned char*, vecaligned_buf)[kPglNypTransposeBufbytes / 2]));
+  TransposeNypblock32(read_iter, read_ul_stride, write_ul_stride, read_batch_size, write_batch_size, write_iter, DowncastToUc(vecaligned_buf), &(DowncastToUc(vecaligned_buf)[kPglNypTransposeBufbytes / 2]));
 #endif
 }
 

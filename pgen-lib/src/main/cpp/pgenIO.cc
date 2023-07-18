@@ -593,20 +593,20 @@ namespace pgenlib {
  */
 
 //cdef class PgenWriter:
-//        cdef STPgenWriter* _state_ptr
-//        cdef uintptr_t* _nonref_flags
-//        cdef PgenGlobalFlags _phase_dosage_gflags
-//        cdef uint32_t _allele_ct_limit
-//        # preallocate buffers we'll use repeatedly
-//        cdef uintptr_t* _genovec
-//        cdef uintptr_t* _patch_01_set
-//        cdef AlleleCode* _patch_01_vals
-//        cdef uintptr_t* _patch_10_set
-//        cdef AlleleCode* _patch_10_vals
-//        cdef uintptr_t* _phasepresent
-//        cdef uintptr_t* _phaseinfo
-//        cdef uintptr_t* _dosage_present
-//        cdef uint16_t* _dosage_main
+//    cdef STPgenWriter* _state_ptr
+//    cdef uintptr_t* _nonref_flags
+//    cdef PgenGlobalFlags _phase_dosage_gflags
+//    cdef uint32_t _allele_ct_limit
+//    # preallocate buffers we'll use repeatedly
+//    cdef uintptr_t* _genovec
+//    cdef uintptr_t* _patch_01_set
+//    cdef AlleleCode* _patch_01_vals
+//    cdef uintptr_t* _patch_10_set
+//    cdef AlleleCode* _patch_10_vals
+//    cdef uintptr_t* _phasepresent
+//    cdef uintptr_t* _phaseinfo
+//    cdef uintptr_t* _dosage_present
+//    cdef uint16_t* _dosage_main
 //
 //
 //def __cinit__(self, bytes filename, uint32_t sample_ct,
@@ -748,41 +748,41 @@ namespace pgenlib {
 //        raise RuntimeError("append_alleles() error " + str(reterr))
 //    return
 //
-//    cpdef append_partially_phased(self, np.ndarray[np.int32_t,mode="c"] allele_int32, np.ndarray[np.uint8_t,cast=True] phasepresent, object allele_ct = None):
-//        if (self._phase_dosage_gflags & kfPgenGlobalHardcallPhasePresent) == 0:
-//            raise RuntimeError("append_partially_phased cannot be called when PgenWriter was constructed with hardcall_phase_present False")
-//        cdef int32_t* allele_codes = <int32_t*>(&(allele_int32[0]))
-//        cdef unsigned char* phasepresent_bytes = <unsigned char*>(&(phasepresent[0]))
-//        cdef uint32_t sample_ct = SpgwGetSampleCt(self._state_ptr)
-//        cdef uint32_t allele_ct_limit = self._allele_ct_limit
-//        cdef uintptr_t* genovec = self._genovec
-//        cdef uintptr_t* phasepresent_buf = self._phasepresent
-//        cdef uintptr_t* phaseinfo = self._phaseinfo
-//        cdef uintptr_t* patch_01_set = self._patch_01_set
-//        cdef AlleleCode* patch_01_vals = self._patch_01_vals
-//        cdef uintptr_t* patch_10_set = self._patch_10_set
-//        cdef AlleleCode* patch_10_vals = self._patch_10_vals
-//        cdef uint32_t patch_01_ct
-//        cdef uint32_t patch_10_ct
-//        cdef int32_t observed_allele_ct = ConvertMultiAlleleCodesUnsafe(allele_codes, phasepresent_bytes, sample_ct, genovec, patch_01_set, patch_01_vals, patch_10_set, patch_10_vals, &patch_01_ct, &patch_10_ct, phasepresent_buf, phaseinfo)
-//        if observed_allele_ct == -1:
-//            raise RuntimeError("append_partially_phased called with invalid allele codes")
-//        cdef uint32_t write_allele_ct = <uint32_t>(observed_allele_ct)
-//        if write_allele_ct > allele_ct_limit:
-//            raise RuntimeError("append_partially_phased called with allele codes >= allele_ct_limit; you may need to construct the PgenWriter with a higher allele_ct_limit setting")
-//        if allele_ct is not None:
-//            if allele_ct < write_allele_ct:
-//                raise RuntimeError("append_partially_phased called with allele codes >= allele_ct argument")
-//            if allele_ct > allele_ct_limit:
-//                raise RuntimeError("append_partially_phased called with allele_ct > allele_ct_limit")
-//            write_allele_ct = allele_ct
-//        cdef PglErr reterr
-//        if (patch_01_ct == 0) and (patch_10_ct == 0):
-//            reterr = SpgwAppendBiallelicGenovecHphase(genovec, phasepresent_buf, phaseinfo, self._state_ptr)
-//        else:
-//            reterr = SpgwAppendMultiallelicGenovecHphase(genovec, patch_01_set, patch_01_vals, patch_10_set, patch_10_vals, phasepresent_buf, phaseinfo, write_allele_ct, patch_01_ct, patch_10_ct, self._state_ptr)
-//        if reterr != kPglRetSuccess:
-//            raise RuntimeError("append_partially_phased() error " + str(reterr))
-//        return
+//cpdef append_partially_phased(self, np.ndarray[np.int32_t,mode="c"] allele_int32, np.ndarray[np.uint8_t,cast=True] phasepresent, object allele_ct = None):
+//    if (self._phase_dosage_gflags & kfPgenGlobalHardcallPhasePresent) == 0:
+//        raise RuntimeError("append_partially_phased cannot be called when PgenWriter was constructed with hardcall_phase_present False")
+//    cdef int32_t* allele_codes = <int32_t*>(&(allele_int32[0]))
+//    cdef unsigned char* phasepresent_bytes = <unsigned char*>(&(phasepresent[0]))
+//    cdef uint32_t sample_ct = SpgwGetSampleCt(self._state_ptr)
+//    cdef uint32_t allele_ct_limit = self._allele_ct_limit
+//    cdef uintptr_t* genovec = self._genovec
+//    cdef uintptr_t* phasepresent_buf = self._phasepresent
+//    cdef uintptr_t* phaseinfo = self._phaseinfo
+//    cdef uintptr_t* patch_01_set = self._patch_01_set
+//    cdef AlleleCode* patch_01_vals = self._patch_01_vals
+//    cdef uintptr_t* patch_10_set = self._patch_10_set
+//    cdef AlleleCode* patch_10_vals = self._patch_10_vals
+//    cdef uint32_t patch_01_ct
+//    cdef uint32_t patch_10_ct
+//    cdef int32_t observed_allele_ct = ConvertMultiAlleleCodesUnsafe(allele_codes, phasepresent_bytes, sample_ct, genovec, patch_01_set, patch_01_vals, patch_10_set, patch_10_vals, &patch_01_ct, &patch_10_ct, phasepresent_buf, phaseinfo)
+//    if observed_allele_ct == -1:
+//        raise RuntimeError("append_partially_phased called with invalid allele codes")
+//    cdef uint32_t write_allele_ct = <uint32_t>(observed_allele_ct)
+//    if write_allele_ct > allele_ct_limit:
+//        raise RuntimeError("append_partially_phased called with allele codes >= allele_ct_limit; you may need to construct the PgenWriter with a higher allele_ct_limit setting")
+//    if allele_ct is not None:
+//        if allele_ct < write_allele_ct:
+//            raise RuntimeError("append_partially_phased called with allele codes >= allele_ct argument")
+//        if allele_ct > allele_ct_limit:
+//            raise RuntimeError("append_partially_phased called with allele_ct > allele_ct_limit")
+//        write_allele_ct = allele_ct
+//    cdef PglErr reterr
+//    if (patch_01_ct == 0) and (patch_10_ct == 0):
+//        reterr = SpgwAppendBiallelicGenovecHphase(genovec, phasepresent_buf, phaseinfo, self._state_ptr)
+//    else:
+//        reterr = SpgwAppendMultiallelicGenovecHphase(genovec, patch_01_set, patch_01_vals, patch_10_set, patch_10_vals, phasepresent_buf, phaseinfo, write_allele_ct, patch_01_ct, patch_10_ct, self._state_ptr)
+//    if reterr != kPglRetSuccess:
+//        raise RuntimeError("append_partially_phased() error " + str(reterr))
+//    return
 
 }

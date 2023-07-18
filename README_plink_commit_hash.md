@@ -1,7 +1,7 @@
 The plink-ng source in this repo is from plink-ng commit:
 
-commit b14b2e7fab382cc993028491aa9d9c8609023436
+commit 9bf4653b59f7ee415c4b98ad3257b797168c9fcd
 Author: Christopher Chang <chrchang523@gmail.com>
-Date:   Tue May 16 18:20:17 2023 -0400
+Date:   Fri Jul 14 14:45:24 2023 -0700
 
-    a5
+    bcf debug
