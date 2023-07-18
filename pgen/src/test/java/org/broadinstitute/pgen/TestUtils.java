@@ -313,6 +313,10 @@ public class TestUtils {
                 // says they were phased or not, so detect and track those, but accept them as "concordant"
                 Assert.assertEquals(actual.getAllele(0), expected.getAllele(0));
                 Assert.assertEquals(actual.getAllele(1), expected.getAllele(1));
+                // now make sure they're homozygous (even if they're no-calls), since we only want to accept phase changes as
+                // "concordant" if they're homozygous. note that we test the allele directly since htsjdk doesn't return
+                // isHom()==true for "./." or ".|.", since they're neither homref nor homvar.
+                Assert.assertEquals(actual.getAllele(0), actual.getAllele(1));
                 concordantPhaseFailures++;
             } else {
                 Assert.assertEquals(actGenString, expGenString);
