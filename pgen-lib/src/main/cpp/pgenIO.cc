@@ -11,18 +11,27 @@
 
 namespace pgenlib {
     static const int kErrMessageBufSize = 1024;
-    static plink2::PgenWriteMode validatePgenWriteMode(const uint32_t pGenWriteMode, const long variantCount);
-    static plink2::PgenGlobalFlags pgenlibFlagsToPlink2Flags(const uint32_t pgenlibFlags);
-    static PgenContext *initPgenContext(
+    static plink2::PgenWriteMode ValidatePgenWriteMode(const uint32_t pGenWriteMode, const long variantCount);
+    static plink2::PgenGlobalFlags PgenlibFlagsToPlink2Flags(const uint32_t pgenlibFlags);
+    static PgenContext *InitPgenContext(
         const char* cFilename,
         const plink2::PgenWriteMode pgenWriteMode,
         const uint32_t writeFlags,
         const long variantCount,
         const int sampleCount,
         const int maxAltAlleles);
-    static bool getAllPhased(const PgenContext *pGenContext, const unsigned char *phase_bytes);
-    static void appendAllelesPartiallyPhased(const PgenContext *const pGenContext, const int32_t* allele_codes, const unsigned char* phase_bytes, int32_t allele_ct);
-    static void appendAllelesNotPartiallyPhased(const PgenContext *const pGenContext, const int32_t* allele_codes, const unsigned char* phase_bytes, int32_t allele_ct, bool alPhased);
+    static bool GetAllPhased(const PgenContext *pGenContext, const unsigned char *phase_bytes);
+    static void AppendAllelesPartiallyPhased(
+            const PgenContext *const pGenContext,
+            const int32_t* allele_codes,
+            const unsigned char* phase_bytes,
+            const int32_t allele_ct);
+    static void AppendAllelesAllOrNonePhased(
+            const PgenContext *const pGenContext,
+            const int32_t* allele_codes,
+            const unsigned char* phase_bytes,
+            const int32_t allele_ct,
+            const bool allPhased);
 
     /**
      * Start a new PGEN write session, and return a pointer to a PgenContext for the writer.
@@ -36,7 +45,7 @@ namespace pgenlib {
      * this function to a series of calls to appendAlleles, after which the PgenContext session should be closed
      * via a call to closePgen.
      *
-     * An example PGEN writer lifecyle is illustrated here:
+     * An example PGEN writer lifecycle is illustrated here:
      *
      *      const pgenlib::PgenContext *const pgen_context = pgenlib::openPgen(
      *          file_name,
@@ -47,10 +56,10 @@ namespace pgenlib {
      *          plink2::kPglMaxAltAlleleCt);
      *
      *      for (int i = 0; i < n_variants; i++) {
-     *          pgenlib::appendAlleles(pgen_context, allele_codes, allele_ct);
+     *          pgenlib::AppendAlleles(pgen_context, allele_codes, allele_ct);
      *      }
-     *      long variantCount = getNumberOfVariantsWritten(pgen_context);
-     *      closePgen(pgen_context, 0);
+     *      long variantCount = GetNumberOfVariantsWritten(pgen_context);
+     *      ClosePgen(pgen_context, 0);
      *
      *  Once the PgenContext has been closed, it can no longer be used to write allele codes.
      *
@@ -69,11 +78,12 @@ namespace pgenlib {
      * @param maxAltAlleles - the maximum number of alleles for any variant that will be written - this determines the
      * range of valid (zero based) allele codes that can be provided when writing genotypes to this writer. Must be
      * in the range 2..plink2::kPglMaxAltAlleleCt. If the variant count is unknown when the writer is created, use
-     * the value pgenlib::kVariantCountUnknown (although in this case, write mode plink2::PgenWriteMode:: may not be used).
+     * the value pgenlib::kVariantCountUnknown (although in this case, write mode
+     * plink2::PgenWriteMode::kPgenWriteBackwardSeek (3) may not be used).
      *
      * @return a PgenContext
      */
-    PgenContext *openPgen(
+    PgenContext *OpenPgen(
             const char* cFilename,
             const uint32_t pgenWriteModeInt,
             const uint32_t writeFlags,
@@ -82,7 +92,7 @@ namespace pgenlib {
             const int maxAltAlleles) {
 
         // validate the requested pgen write mode, and sample and variant counts
-        plink2::PgenWriteMode pgenWriteMode = validatePgenWriteMode(pgenWriteModeInt, variantCount);
+        plink2::PgenWriteMode pgenWriteMode = ValidatePgenWriteMode(pgenWriteModeInt, variantCount);
         if (sampleCount < 1) {
             char errMessageBuff[kErrMessageBufSize];
             snprintf(errMessageBuff,
@@ -132,10 +142,10 @@ namespace pgenlib {
             throw PgenException("The multi-allelic write flag should only be used if phasing information is also provided (even if the underlying data is multiallelic).");
         }
 
-        return initPgenContext(cFilename, pgenWriteMode, writeFlags, variantCount, sampleCount, maxAltAlleles);
+        return InitPgenContext(cFilename, pgenWriteMode, writeFlags, variantCount, sampleCount, maxAltAlleles);
     }
 
-    PgenContext *initPgenContext(
+    PgenContext *InitPgenContext(
             const char* cFilename,
             const plink2::PgenWriteMode pgenWriteMode,
             const uint32_t writeFlags,
@@ -152,34 +162,34 @@ namespace pgenlib {
             free(pGenContext);
             throw PgenException("Native code failure allocating STPgenWriter");
         }
-        pGenContext->writeFlags = writeFlags;
+        pGenContext->write_flags = writeFlags;
 
         // convert sampleCount and variantCount to the types plink uses
-        pGenContext->sampleCount = static_cast<uint32_t>(sampleCount);
+        pGenContext->sample_count = static_cast<uint32_t>(sampleCount);
         uint32_t variant_ct = static_cast<uint32_t>(variantCount);
         // total max allele count is max alt count + 1
         pGenContext->allele_ct_limit = static_cast<uint32_t>(maxAltAlleles + 1);
 
-        uint32_t bitvec_cacheline_ct = plink2::DivUp(pGenContext->sampleCount, plink2::kBitsPerCacheline);
+        uint32_t bitvec_cacheline_ct = plink2::DivUp(pGenContext->sample_count, plink2::kBitsPerCacheline);
         uintptr_t alloc_cacheline_ct = 0;
         const plink2::PglErr init1Result = plink2::SpgwInitPhase1(cFilename,
                                                                 nullptr,  // allele index offsets (for reading multi allele ?)
                                                                 nullptr, // non-ref flags
                                                                 variant_ct,
-                                                                pGenContext->sampleCount,
+                                                                pGenContext->sample_count,
                                                                 pGenContext->allele_ct_limit,
                                                                 pgenWriteMode,
-                                                                pgenlibFlagsToPlink2Flags(writeFlags),
+                                                                PgenlibFlagsToPlink2Flags(pGenContext->write_flags),
                                                                 1, // non-ref flags storage
                                                                 pGenContext->spgwp,
                                                                 &alloc_cacheline_ct,
                                                                 &pGenContext->max_vrec_len);
         throwOnPglErr(init1Result, "plink2 initialization (SpgwInitPhase1 failed)");
 
-        uint32_t genovec_cacheline_ct = plink2::DivUp(pGenContext->sampleCount, plink2::kNypsPerCacheline);
-        uint32_t patch_01_vals_cacheline_ct = plink2::DivUp(pGenContext->sampleCount * sizeof(plink2::AlleleCode), plink2::kCacheline);
-        uint32_t patch_10_vals_cacheline_ct = plink2::DivUp(pGenContext->sampleCount * 2 * sizeof(plink2::AlleleCode), plink2::kCacheline);
-        uint32_t dosage_main_cacheline_ct = plink2::DivUp(pGenContext->sampleCount, (2 * plink2::kInt32PerCacheline));
+        uint32_t genovec_cacheline_ct = plink2::DivUp(pGenContext->sample_count, plink2::kNypsPerCacheline);
+        uint32_t patch_01_vals_cacheline_ct = plink2::DivUp(pGenContext->sample_count * sizeof(plink2::AlleleCode), plink2::kCacheline);
+        uint32_t patch_10_vals_cacheline_ct = plink2::DivUp(pGenContext->sample_count * 2 * sizeof(plink2::AlleleCode), plink2::kCacheline);
+        uint32_t dosage_main_cacheline_ct = plink2::DivUp(pGenContext->sample_count, (2 * plink2::kInt32PerCacheline));
 
         // There are two copies of pgenlib.pyx in the plink2 build, and they have many differences. One uses +3 for
         // this calculation, and one uses +5. Prefer the one in src (since thats the one that is the template for this
@@ -225,8 +235,8 @@ namespace pgenlib {
         //    # bugfix (16 Apr 2023): SpgwAppendBiallelicGenovec[Hphase] assumes
         //    # trailing bits are clear
         //    self._genovec[(sample_ct - 1) // kBitsPerWordD2] = 0
-        pGenContext->genovec[(pGenContext->sampleCount - 1) / plink2::kBitsPerWordD2] = 0; // floor division
-        pGenContext->phasepresent[(pGenContext->sampleCount - 1) / plink2::kBitsPerWord] = 0; // floor division
+        pGenContext->genovec[(pGenContext->sample_count - 1) / plink2::kBitsPerWordD2] = 0; // floor division
+        pGenContext->phasepresent[(pGenContext->sample_count - 1) / plink2::kBitsPerWord] = 0; // floor division
 
         return pGenContext;
     }
@@ -248,7 +258,7 @@ namespace pgenlib {
      * @param allele_ct - the number of possible allele values for this variant (not the number of unique alleles
      * that are ACTUALLY observed/present in allele_codes)
    */
-   void appendAlleles(
+   void AppendAlleles(
            const PgenContext *const pGenContext,
            const int32_t* allele_codes,
            const unsigned char* phase_bytes,
@@ -257,17 +267,17 @@ namespace pgenlib {
          // determine up front whether all the genotypes are phased so we can take the right code path through plink
          //TODO: we could probably skip this pass through the phasing track altogether if we required the caller to
          // keep track of the "allPhased" state while assembling the phasing data, and then provide it via a parameter
-         bool allPhased = getAllPhased(pGenContext, phase_bytes);
-         if (pGenContext->writeFlags & kWriteFlagPreservePhasing && !allPhased) {
+         bool allPhased = GetAllPhased(pGenContext, phase_bytes);
+         if (pGenContext->write_flags & kWriteFlagPreservePhasing && !allPhased) {
              // there is a phasing track, but the genotypes are either mixed phase or all un-phased
-             appendAllelesPartiallyPhased(
+             AppendAllelesPartiallyPhased(
                      pGenContext,
                      allele_codes,
                      phase_bytes,
                      allele_ct);
          } else {
              // there is either no phasing track, or there is a phasing track and all the genotypes are phased
-             appendAllelesNotPartiallyPhased(
+             AppendAllelesAllOrNonePhased(
                      pGenContext,
                      allele_codes,
                      phase_bytes,
@@ -276,7 +286,7 @@ namespace pgenlib {
          }
      }
 
-    void appendAllelesPartiallyPhased(
+    void AppendAllelesPartiallyPhased(
             const PgenContext *const pGenContext,
             const int32_t* allele_codes,
             const unsigned char* phase_bytes,
@@ -286,7 +296,7 @@ namespace pgenlib {
         int32_t observed_allele_ct = plink2::ConvertMultiAlleleCodesUnsafe(
                 allele_codes,
                 phase_bytes, //  may be null
-                pGenContext->sampleCount,
+                pGenContext->sample_count,
                 pGenContext->genovec,
                 pGenContext->patch_01_set,
                 pGenContext->patch_01_vals,
@@ -356,18 +366,18 @@ namespace pgenlib {
         throwOnPglErr(pglErr, "appendAlleles");
     }
 
-   void appendAllelesNotPartiallyPhased(
+   void AppendAllelesAllOrNonePhased(
              const PgenContext *const pGenContext,
              const int32_t* allele_codes,
              const unsigned char* phase_bytes,
              const int32_t allele_ct,
-             bool allPhased) {
+             const bool allPhased) {
         uint32_t patch_01_ct;
         uint32_t patch_10_ct;
         int32_t observed_allele_ct = plink2::ConvertMultiAlleleCodesUnsafe(
                 allele_codes,
                 phase_bytes, //  may be null
-                pGenContext->sampleCount,
+                pGenContext->sample_count,
                 pGenContext->genovec,
                 pGenContext->patch_01_set,
                 pGenContext->patch_01_vals,
@@ -462,7 +472,7 @@ namespace pgenlib {
      * of variants written, must equal the number of variants projected to be written when the pgen context was
      * initially opened. otherwise a pgenlib::PGenException will be thrown.
      */
-    void closePgen(const PgenContext *const pGenContext, const long numVariantsDropped) {
+    void ClosePgen(const PgenContext *const pGenContext, const long numVariantsDropped) {
         const uint32_t declaredVariantCt = plink2::SpgwGetVariantCt(pGenContext->spgwp);
         const uint32_t writtenVariantCt = plink2::SpgwGetVidx(pGenContext->spgwp);
         const uint32_t droppedVariantCt = static_cast<uint32_t>(numVariantsDropped);
@@ -513,11 +523,11 @@ namespace pgenlib {
         }
     }
 
-    long getNumberOfVariantsWritten(const PgenContext *const pGenContext) {
+    long GetNumberOfVariantsWritten(const PgenContext *const pGenContext) {
         return plink2::SpgwGetVidx(pGenContext->spgwp);
     }
 
-    plink2::PgenWriteMode validatePgenWriteMode(const uint32_t pgenWriteModeInt, const long variantCount) {
+    plink2::PgenWriteMode ValidatePgenWriteMode(const uint32_t pgenWriteModeInt, const long variantCount) {
         switch (pgenWriteModeInt) {
             case plink2::kPgenWriteBackwardSeek:
                 if (variantCount == static_cast<long>(pgenlib::kVariantCountUnknown)) {
@@ -544,7 +554,7 @@ namespace pgenlib {
 
     // assumes that the pgenlibFlags have been properly validated, and that kWriteFlagMultiAllelic is only set if
     // there is also phasing info
-    plink2::PgenGlobalFlags pgenlibFlagsToPlink2Flags(const uint32_t pgenlibFlags) {
+    plink2::PgenGlobalFlags PgenlibFlagsToPlink2Flags(const uint32_t pgenlibFlags) {
         plink2::PgenGlobalFlags plinkFlags = plink2::kfPgenGlobal0;
         if (pgenlibFlags & pgenlib::kWriteFlagMultiAllelic) {
             plinkFlags |= plink2::kfPgenGlobalMultiallelicHardcallFound;
@@ -558,14 +568,14 @@ namespace pgenlib {
     // In order to take the correct code path through plink, we need to determine up front whether all
     // the genotypes are phased. If there is no phasing track at all, allPhased = false, but otherwise,
     // start out assuming all are phased and then bail as soon as we find one unphased genotype.
-    bool getAllPhased(const PgenContext *pGenContext, const unsigned char *phase_bytes) {
+    bool GetAllPhased(const PgenContext *pGenContext, const unsigned char *phase_bytes) {
         bool allPhased = false;
-        if (pGenContext->writeFlags & kWriteFlagPreservePhasing) {
+        if (pGenContext->write_flags & kWriteFlagPreservePhasing) {
             if (phase_bytes == nullptr) {
                 throw PgenException("A phasing track is required since kWriteFlagPreservePhasing was specified");
             }
             allPhased = true;
-            for (int i = 0; i < pGenContext->sampleCount;  i++) {
+            for (int i = 0; i < pGenContext->sample_count;  i++) {
                 if (!phase_bytes[i]) {
                     return false;
                 }

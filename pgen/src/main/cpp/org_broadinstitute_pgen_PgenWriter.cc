@@ -34,7 +34,7 @@ Java_org_broadinstitute_pgen_PgenWriter_openPgen (JNIEnv *env, jclass object,
  
     jlong pgenHandle;
     try {
-        PgenContext* const pgenContext = openPgen(
+        PgenContext* const pgenContext = OpenPgen(
             cFilename,
             static_cast<uint32_t>(pgenWriteModeInt),
             static_cast<uint32_t>(writeFlags),
@@ -75,7 +75,7 @@ Java_org_broadinstitute_pgen_PgenWriter_appendAlleles(JNIEnv *env, jclass object
         } else {
             PgenContext *pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
             try {
-                appendAlleles(pgenContext, allele_codes, phase_buffer, alleleCount);
+                AppendAlleles(pgenContext, allele_codes, phase_buffer, alleleCount);
                 return true;
             } catch (const PgenException &e) {
                 reThrowAsAsyncJavaException(env, e, "Native code failure in appendAlleles");
@@ -89,8 +89,14 @@ JNIEXPORT jboolean JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_closePgen(JNIEnv *env, jclass object, jlong pgenHandle, jlong droppedVariantCount) {
     PgenContext *pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
     try {
-        closePgen(pgenContext, droppedVariantCount);
+        ClosePgen(pgenContext, droppedVariantCount);
         return true;
+    } catch (PgenEmptyPgenException &e) {
+        // no variants were written - an empty PGEN isn't valid, so give the caller a chance to hande/report that
+        throwAsyncJavaException(
+            env,
+            e.what(),
+            "org/broadinstitute/pgen/PgenEmptyPgenException");
     } catch (PgenMissingVariantsException &e) {
         // Don't re-throw variant count exceptions as a Java exception, since this function is called from the
         // close method of the Java writer. If the writer was created in a try-with-resources, and writing has
@@ -106,19 +112,13 @@ Java_org_broadinstitute_pgen_PgenWriter_closePgen(JNIEnv *env, jclass object, jl
         std::cerr << "Error ocurred in  native code during close: " << e.what();
         reThrowAsAsyncJavaException(env, e, "Native code failure closing PGEN context");
         throw e;
-    } catch (PgenEmptyPgenException &e) {
-        // no variants were written - an empty PGEN isn't valid, so give the caller a chance to hande/report that
-        throwAsyncJavaException(
-            env,
-            e.what(),
-            "org/broadinstitute/pgen/PgenEmptyPgenException");
-   }
+    }
 }
 
 JNIEXPORT jlong JNICALL
 Java_org_broadinstitute_pgen_PgenWriter_getPgenVariantCount(JNIEnv *env, jclass object, jlong pgenHandle) {
     PgenContext *pgenContext = reinterpret_cast<PgenContext*>(pgenHandle);
-    const long varCount = getNumberOfVariantsWritten(pgenContext);
+    const long varCount = GetNumberOfVariantsWritten(pgenContext);
     return varCount;
 }
 

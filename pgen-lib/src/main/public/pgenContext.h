@@ -10,12 +10,7 @@ namespace pgenlib {
 
     typedef struct PgenContext {
         plink2::STPgenWriter* spgwp;
-        // keep track of the arena memory so we can free it at the end
-        unsigned char* spgw_alloc;
-        // cdef uintptr_t* _nonref_flags
-        // cdef PgenGlobalFlags _phase_dosage_gflags
         uint32_t allele_ct_limit;
-
         uintptr_t* genovec;         // genotype vector
         uintptr_t* patch_01_set;
         plink2::AlleleCode* patch_01_vals;
@@ -25,12 +20,13 @@ namespace pgenlib {
         uintptr_t* phaseinfo;
         uintptr_t* dosage_present;
         uint16_t* dosage_main;
-
-        uint32_t sampleCount;
         uint32_t max_vrec_len;
 
-        // non-plink2 fields
-        uint32_t writeFlags; // keep track of whether the caller claims to have phasing data/multi-allelics
+        // (non-plink2) fields added for use by pgenlib code
+        uint32_t sample_count;
+        uint32_t write_flags; // keep track of whether the caller claims to have phasing data/multi-allelics
+        // keep track of the arena memory so we can free it when we're finished
+        unsigned char* spgw_alloc;
     } PgenContext;
 
 }
