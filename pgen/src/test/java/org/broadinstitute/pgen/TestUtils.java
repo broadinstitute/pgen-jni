@@ -298,7 +298,7 @@ public class TestUtils {
 
     // Asserts that the two provided Genotype objects are concordant (not necessarily identical, only that the alleles and type match,
     // and that phasing matches if for called variants (because plink2 changes homozygous variants to be phased, even if they're not, so
-    // we count thse just to keep track, but accept them as concordant)
+    // we count these just to keep track, but accept them as concordant)
     public static long assertGenotypesAreConcordant(final Genotype actual, final Genotype expected, final boolean ignorePhasing) {
         Assert.assertEquals(actual.getSampleName(), expected.getSampleName(), "Genotype sample names");
         Assert.assertEquals(actual.getType(), expected.getType(), "Genotype type");

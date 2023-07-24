@@ -38,7 +38,6 @@ constexpr uint32_t PGEN_FILE_MODE_WRITE_SEPARATE_INDEX = static_cast<int>(plink2
 constexpr uint32_t PGEN_FILE_MODE_WRITE_AND_COPY = static_cast<int>(plink2::PgenWriteMode::kPgenWriteAndCopy);
 
 //******************* Tests *******************
-
 // simple test to exercise throwing/catching of PgenException
 BOOST_AUTO_TEST_CASE(TestExceptionPropagation) {
     const char* const expectedPropagationMessage = "Fake pgen exception";
