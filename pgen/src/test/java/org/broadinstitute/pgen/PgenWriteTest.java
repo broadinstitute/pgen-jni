@@ -290,15 +290,15 @@ public class PgenWriteTest {
         final List<Allele> alleles = List.of(Allele.REF_A, Allele.ALT_C, Allele.ALT_G);
         final VariantContextBuilder vcb = new VariantContextBuilder("test", "chr1", 1, 1, alleles);
         final VariantContext ploidy3VC = vcb.genotypes(
-            List.of(new GenotypeBuilder().name("s1").alleles(alleles).make())
+            List.of(new GenotypeBuilder().name(TestUtils.SINGLE_SAMPLE_HEADER_SAMPLE_NAME).alleles(alleles).make())
         ).make();
         Assert.assertEquals(ploidy3VC.getMaxPloidy(2), 3);
 
         // For reasons unknown, putting the PgenWriter constructor inside the try-with-resources results
-        // in an IllegalArgumentException, due to an illegal attempt to self-suppress an exception
-        // (somewhere code is trying to add this exception to it's own suppressed exception list), but only
-        // when runnning inside VS Code. This does not happen when gradle runs the test, but keep it
-        // outside.
+        // in an IllegalArgumentException, but only when runnning inside VS Code, due to an illegal attempt
+        // to self-suppress an exception (somewhere code is trying to add this exception to it's own suppressed
+        // exception list). This does not happen when gradle runs the test, but keep it outside so the test
+        // works in VSCode.
         PgenWriter pgenWriter =  null;
         try {
             pgenWriter = new PgenWriter(
@@ -377,9 +377,9 @@ public class PgenWriteTest {
          }
     }
     
-    // force our internal allele buffer (the one containing the allele_codes that are passed to plink2) to be overflowed
-    @Test(expectedExceptions = RuntimeException.class)
-    public void testAlleleBufferOverflow() throws IOException {
+    //todo: add a dataprovider that uses files with different combinations of missing gts
+    @Test
+    public void testMissingGenotypes() throws IOException {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("writeBufferOverflow");
         final TestUtils.VcfMetaData vcfMetaData = TestUtils.getVcfMetaData(Paths.get("testdata/CEUtrioTest.vcf"));
         try (final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false);
@@ -393,23 +393,14 @@ public class PgenWriteTest {
                     PgenWriter.VARIANT_COUNT_UNKNOWN, 
                     PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES)) {
                 // first, add one good variant
-                VariantContext vc = reader.iterator().next();
+                final VariantContext vc = reader.iterator().next();
                 writer.add(vc);
 
-                // now conjure and write up a bad variant that will cause buffer overflow due to having too many genotypes
+                // now conjure up and write a bad variant that will cause buffer underflow due to having not enough genotypes
                 final VariantContextBuilder vcb = new VariantContextBuilder(vc);
-                final List<Genotype> gts = new ArrayList<>();
-                vc.getGenotypes().stream().forEach(gt -> gts.add(gt));
-                vc.getGenotypes().stream().forEach(gt -> gts.add(gt));
-
-                writer.add(vcb.genotypes(gts).make()); // throws a runtime exeption due to buffer overflow exception
-        } catch (final RuntimeException e) {
-            // The underlying writer code wraps the BufferOverflowException in a RuntimeException that is decorated
-            // with additional context information. Make sure this RuntimeException is actually caused by a
-            // BufferOverflowException, and then rethrow.
-            Assert.assertTrue(e.getCause() instanceof BufferOverflowException);
-            Assert.assertTrue(e.getMessage().contains("Buffer overflow at position:"));
-            throw e;
+                final List<Genotype> gts = new ArrayList<>(vc.getGenotypes());
+                gts.remove(0);
+                writer.add(vcb.genotypes(gts).make()); // throws a runtime exeption due to buffer underflow exception
         }
     }
 

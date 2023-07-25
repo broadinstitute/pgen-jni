@@ -38,6 +38,7 @@ import htsjdk.variant.vcf.VCFHeader;
 public class TestUtils {
 
     public static String plinkLogExtension = ".log";
+    public static final String SINGLE_SAMPLE_HEADER_SAMPLE_NAME = "atLeastOneSampleRequired";
 
     // class/record to hold a set of temporary plink2 companion files as paths (.pgen/.pvar/.psam/.log)
     public record PgenFileSet(Path pGenPath, Path pVarPath, Path pSamPath, Path plinkLogFile) {
@@ -105,7 +106,7 @@ public class TestUtils {
         final VCFHeader vcfHeader = new VCFHeader(
             Collections.EMPTY_SET,
             new HashSet<String>() {{
-                add("atLeastOneSampleRequired");
+                add(SINGLE_SAMPLE_HEADER_SAMPLE_NAME);
             }});
         Assert.assertEquals(vcfHeader.getNGenotypeSamples(), 1, "the test ehaders must have at least one sample");
         return vcfHeader;

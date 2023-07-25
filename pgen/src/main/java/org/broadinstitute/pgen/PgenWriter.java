@@ -297,65 +297,34 @@ public class PgenWriter implements VariantContextWriter {
         phasingBuffer.clear();
         final Map<Allele, Integer> alleleMap = buildAlleleMap(vc);
     
-        int i = 0;
-        for (final Genotype g : vc.getGenotypes()) {
-            if (g.getPloidy() != 2) {
-                throw new PgenException(
-                    String.format("PGEN only supports diploid samples but a sample with ploidy = %d was found at variant %s",
-                        g.getPloidy(),
-                        vc.toStringWithoutGenotypes()));
-            } else if (g.getAlleles().size() != 2) {
-                throw new IllegalArgumentException(String.format("Bad allele count in genotype %d", g.getAlleles().size()));
-            } else if (i > sampleNames.size()) {
-                // for some reason, this VC has MORE genotypes than the header specified
-                throw new PgenException(
-                    String.format("Variant context sample count (%d) does not match VCF header sample count (%d)",
-                        sampleNames.size(),
-                        vc.getGenotypes().size()));
-            }
-
-            // GVS doesn't populate genotypes that are no-call, so synthesize allele codes and phasing for any genotypes in
-            // between the last one that we populated (if any), and the one we currently have
-            while (i < sampleNames.size() && !g.getSampleName().equals(sampleNames.get(i))) {
+        // because there may be missing genotyopes, it is significantly cleaner code-wise to iterate through the 
+        // sample names than through the genotypes, but this code does not recognize if there is a genotype in the VC
+        // that has a sample name that is not in the header
+        for (final String sampleName : sampleNames) {
+            final Genotype g = vc.getGenotype(sampleName);
+            if (g != null) {
+                if (g.getPloidy() != 2) {
+                    throw new PgenException(
+                        String.format("PGEN only supports diploid samples but a sample with ploidy = %d was found at variant %s",
+                            g.getPloidy(),
+                            vc.toStringWithoutGenotypes()));
+                } else if (g.getAlleles().size() != 2) {
+                    throw new IllegalArgumentException(String.format("Bad allele count in genotype %d", g.getAlleles().size()));
+                }
+                for (final Allele allele : g.getAlleles()) {
+                    //TODO: should this check for/handle the case where the allele is not in the allele map for the VC ?
+                    updateAlleleBuffer(vc, g, allele, alleleMap.get(allele));
+                }
+                updatePhasingBuffer(vc, g, g.isPhased() ? PHASED_CODE : UNPHASED_CODE);
+            } else {
+                // synthesize no-call values for any missing genotypes
+                updateAlleleBuffer(vc, null, null, PLINK2_NO_CALL_VALUE);
                 updateAlleleBuffer(vc, null, null, PLINK2_NO_CALL_VALUE);
                 updatePhasingBuffer(vc, null, UNPHASED_CODE);
-                i++;
-            }
-
-            // if we terminated the loop because we never found a sample name that matches the sample name for this genotype,
-            // then we can't continue because we've already filled the buffer, but we're still hoding onto a genotype, so bail
-            if (i == sampleNames.size()) {
-                //TODO: fix this error message to say that the genotypes don't match the header or something
-                // for some reason, this VC either as MORE genotypes than the header specified, or else the samples are in a different order,
-                throw new PgenException(
-                    String.format("Variant context sample count (%d) does not match VCF header sample count (%d), or the samples order does not match the header sample order",
-                        sampleNames.size(),
-                        vc.getGenotypes().size()));
-            }
-
-            for (final Allele allele : g.getAlleles()) {
-                updateAlleleBuffer(vc, g, allele, alleleMap.get(allele));
-            }
-            updatePhasingBuffer(vc, g, g.isPhased() ? PHASED_CODE : UNPHASED_CODE);
-            i++;
+           }
         }
 
-        // if there are missing genotypes at the end of the VC, synthesize allele codes and phasing to fill out the
-        // buffers
-        while (i < sampleNames.size()) {
-            updateAlleleBuffer(vc, null, null, PLINK2_NO_CALL_VALUE);
-            updateAlleleBuffer(vc, null, null, PLINK2_NO_CALL_VALUE);
-            updatePhasingBuffer(vc, null, UNPHASED_CODE);
-            i++;
-        }
-        
-        if (i != sampleNames.size()) {
-            // for some reason, this VC has FEWER genotypes than the header specified
-            throw new PgenException(
-                String.format("Variant context sample count (%d) does not match VCF header sample count (%d)",
-                    sampleNames.size(),
-                    vc.getGenotypes().size()));
-        } else if (alleleBuffer.position() != alleleBuffer.limit()) {
+         if (alleleBuffer.position() != alleleBuffer.limit()) {
             throw new IllegalStateException(
                 String.format("Allele buffer is not completely filled, position is %d but expected %d.",
                     alleleBuffer.position(),
@@ -370,7 +339,6 @@ public class PgenWriter implements VariantContextWriter {
         alleleBuffer.rewind();
         phasingBuffer.rewind();
         final boolean appendRet = appendAlleles(pgenContextHandle, alleleBuffer, phasingBuffer, alleleMap.size() - 1);
-        
         if (appendRet) { // only add to the pvar if appendAlleles succeeded
             pVarWriter.add(vc);
         }
