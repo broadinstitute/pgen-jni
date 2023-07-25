@@ -56,7 +56,6 @@ public final class NativeLibraryUtils {
          * @param resource Embedded resource.
          * @param file File path to write.
          */
-        @SuppressWarnings("deprecation")
         public void writeResource(File file) {
             InputStream inputStream = getResourceContentsAsStream();
             OutputStream outputStream = null;

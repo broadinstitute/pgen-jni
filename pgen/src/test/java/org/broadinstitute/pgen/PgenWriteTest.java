@@ -11,7 +11,6 @@ import htsjdk.variant.variantcontext.GenotypeBuilder;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
 import htsjdk.variant.vcf.VCFFileReader;
-import htsjdk.variant.vcf.VCFHeader;
 
 import org.broadinstitute.pgen.PgenWriter.PgenWriteFlag;
 import org.broadinstitute.pgen.PgenWriter.PgenWriteMode;
