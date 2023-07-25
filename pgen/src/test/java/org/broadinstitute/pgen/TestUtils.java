@@ -239,8 +239,8 @@ public class TestUtils {
                 final VCFHeader actHeader = actReader.getFileHeader();
                 final HashMap<String, Integer> actOffsetMap = actHeader.getSampleNameToOffset();
                 final HashMap<String, Integer> expOffsetMap = expHeader.getSampleNameToOffset();
-                
-                // ensure that our samples are in the same order in the headers, even though I suppose thats not strictly required
+
+                // ensure that our samples are in the same order in the headers
                 for (final Map.Entry<String, Integer> entry : actOffsetMap.entrySet()) {
                     Assert.assertEquals(entry.getValue(), expOffsetMap.get(entry.getKey()));
                 }
@@ -298,7 +298,7 @@ public class TestUtils {
     }
 
     // Asserts that the two provided Genotype objects are concordant (not necessarily identical, only that the alleles and type match,
-    // and that phasing matches if for called variants (because plink2 changes homozygous variants to be phased, even if they're not, so
+    // and that phasing matches for called variants (because plink2 changes homozygous variants to be phased, even if they're not, so
     // we count these just to keep track, but accept them as concordant)
     public static long assertGenotypesAreConcordant(final Genotype actual, final Genotype expected, final boolean ignorePhasing) {
         Assert.assertEquals(actual.getSampleName(), expected.getSampleName(), "Genotype sample names");

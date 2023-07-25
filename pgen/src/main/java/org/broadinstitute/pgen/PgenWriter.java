@@ -111,6 +111,7 @@ public class PgenWriter implements VariantContextWriter {
 
     private static byte PHASED_CODE = (byte) 1;
     private static byte UNPHASED_CODE = (byte) 0;
+    private static int DIPLOID_PLOIDY = 2;
 
     private List<String> sampleNames = null;
     private HtsPath pVarFile = null;
@@ -228,7 +229,7 @@ public class PgenWriter implements VariantContextWriter {
             return;
         }
         
-        alleleBuffer = createBuffer(vcfHeader.getNGenotypeSamples() * 2 * 4); //samples * ploidy * bytes in int32_t (sizeof AlleleCode)
+        alleleBuffer = createBuffer(vcfHeader.getNGenotypeSamples() * DIPLOID_PLOIDY * 4); //samples * ploidy * bytes in int32_t (sizeof AlleleCode)
         if (alleleBuffer == null) {
             //createBuffer threw an async Java exception
             return;
@@ -297,27 +298,33 @@ public class PgenWriter implements VariantContextWriter {
         phasingBuffer.clear();
         final Map<Allele, Integer> alleleMap = buildAlleleMap(vc);
     
-        // because there may be missing genotyopes, it is significantly cleaner code-wise to iterate through the 
-        // sample names than through the genotypes, but this code does not recognize if there is a genotype in the VC
-        // that has a sample name that is not in the header
+        // Because there may be missing genotyopes, it is significantly simpler to have the primary iteration be
+        // through the sample names from the header, rather than through the genotypes.
+        // Note: As it stands, this code does not detect or reject the case where there are one or more genotypes
+        // in the VC that have a sample name that is not in the header (we could certainly keep track of that and
+        // throw, but is it worth the expense ?), or that the order of the genotypes does not match that of the
+        // header.
         for (final String sampleName : sampleNames) {
             final Genotype g = vc.getGenotype(sampleName);
             if (g != null) {
-                if (g.getPloidy() != 2) {
+                if (g.getPloidy() != DIPLOID_PLOIDY) {
                     throw new PgenException(
                         String.format("PGEN only supports diploid samples but a sample with ploidy = %d was found at variant %s",
                             g.getPloidy(),
                             vc.toStringWithoutGenotypes()));
-                } else if (g.getAlleles().size() != 2) {
-                    throw new IllegalArgumentException(String.format("Bad allele count in genotype %d", g.getAlleles().size()));
                 }
                 for (final Allele allele : g.getAlleles()) {
-                    //TODO: should this check for/handle the case where the allele is not in the allele map for the VC ?
+                    final Integer alleleCode = alleleMap.get(allele);
+                    if (alleleCode == null) {
+                        // do we need this test ? VariantContext doesn't seem to allow such a thing to be created
+                        throw new PgenException(
+                            String.format("Allele %s not found in allele map for variant %s", allele.toString(), vc.toStringWithoutGenotypes()));
+                    }
                     updateAlleleBuffer(vc, g, allele, alleleMap.get(allele));
                 }
                 updatePhasingBuffer(vc, g, g.isPhased() ? PHASED_CODE : UNPHASED_CODE);
             } else {
-                // synthesize no-call values for any missing genotypes
+                // fill in unphased diploid no-call values for the missing genotype
                 updateAlleleBuffer(vc, null, null, PLINK2_NO_CALL_VALUE);
                 updateAlleleBuffer(vc, null, null, PLINK2_NO_CALL_VALUE);
                 updatePhasingBuffer(vc, null, UNPHASED_CODE);

@@ -11,6 +11,7 @@ import htsjdk.variant.variantcontext.GenotypeBuilder;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
 import htsjdk.variant.vcf.VCFFileReader;
+import htsjdk.variant.vcf.VCFHeader;
 
 import org.broadinstitute.pgen.PgenWriter.PgenWriteFlag;
 import org.broadinstitute.pgen.PgenWriter.PgenWriteMode;
@@ -20,20 +21,20 @@ import org.testng.annotations.*;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.BufferOverflowException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 
 public class PgenWriteTest {
 
     @SuppressWarnings("unused")
     @Test(expectedExceptions = PgenException.class)
     public void testExceptionPropagation() throws IOException {
-        final PgenFileSet pgenFileSet = PgenFileSet.createTempPgenFileSet("pgenReadOnly");
+        final PgenFileSet pgenFileSet = PgenFileSet.createTempPgenFileSet("testExceptionPropagation");
         pgenFileSet.pGenPath().toFile().setReadOnly();
         try {
             // force an exception to be thrown from pgen-lib by trying to write to a file that is read only
@@ -52,7 +53,7 @@ public class PgenWriteTest {
     // this test is redundant with the more useful testRoundTripCompareWithPlink2 test below, but is convenient for debugging...
     @Test
     public void testWriteSimpleBiallelic() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("writeBiallelic");
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testWriteSimpleBiallelic");
         final TestUtils.VcfMetaData vcfMetaData = TestUtils.getVcfMetaData(Paths.get("testdata/CEUtrioTest.vcf"));
         try (final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false);
              final PgenWriter writer = new PgenWriter(
@@ -175,8 +176,8 @@ public class PgenWriteTest {
     // ensure the PgenWriter constructor rejects attempts to use VARIANT_COUNT_UNKNOWN with PGEN_FILE_MODE_BACKWARD_SEEK file mode,
     // since its forbidden by plink2
     @Test(expectedExceptions = PgenException.class)
-    public void testSeekWriteModeRejectsUnknownVariantCount() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testSeekWriteModeRejectsUnknownVariantCount");
+    public void testRejectSeeWriteModeWithUnknownVariantCount() throws IOException {
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testRejectSeeWriteModeWithUnknownVariantCount");
         final TestUtils.VcfMetaData vcfMetaData = TestUtils.getVcfMetaData(Paths.get("testdata/CEUtrioTest.vcf"));
 
         try (final PgenWriter pgenWriter = new PgenWriter(
@@ -194,12 +195,12 @@ public class PgenWriteTest {
     }
  
     @Test
-    public void testNoWritesWithKnownVariantCount() throws IOException {
+    public void testAcceptNoWritesWithKnownVariantCount() throws IOException {
         // this test is basically to ensure that the pgen-lib C++ code correctly handles closing in the case where
         // the variant count is known, but 0 variants are written (the plink2 code seems to handle it ok if too few
         // variants are written, but not if 0 variants are written, so this tests that pgen-lib specifically handles
-        // that case
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testNoWritesWithKnownVariantCount");
+        // that case)
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testAcceptNoWritesWithKnownVariantCount");
         try (final PgenWriter pgenWriter = new PgenWriter(
                 new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                 TestUtils.createSingleSampleVCFHeader(),
@@ -215,8 +216,8 @@ public class PgenWriteTest {
     }
 
     @Test
-    public void testTooFewWritesWithKnownVariantCount() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testTooFewWritesWithKnownVariantCount");
+    public void testAcceptTooFewWritesWithKnownVariantCount() throws IOException {
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testAcceptTooFewWritesWithKnownVariantCount");
         final TestUtils.VcfMetaData vcfMetaData = TestUtils.getVcfMetaData(Paths.get("testdata/CEUtrioTest.vcf"));
         try (final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false);
              final PgenWriter pgenWriter = new PgenWriter(
@@ -239,8 +240,8 @@ public class PgenWriteTest {
     // fail with filemode PGEN_FILE_MODE_BACKWARD_SEEK, since in that case you're required to provide a variant count up
     // front, and then write that many variants).
     @Test(expectedExceptions=PgenEmptyPgenException.class)
-    public void testNoWritesWithUnknownVariantCount() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testNoWritesWithUnknownVariantCount");
+    public void testRejectNoWritesWithUnknownVariantCount() throws IOException {
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testRejectNoWritesWithUnknownVariantCount");
         try (final PgenWriter writer = new PgenWriter(
                     new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
                     TestUtils.createSingleSampleVCFHeader(),
@@ -286,7 +287,7 @@ public class PgenWriteTest {
     // reject non-diploid variants
     @Test(expectedExceptions = PgenException.class)
     public void testRejectNonDiploid() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("rejectNonDiploid");
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testRejectNonDiploid");
         final List<Allele> alleles = List.of(Allele.REF_A, Allele.ALT_C, Allele.ALT_G);
         final VariantContextBuilder vcb = new VariantContextBuilder("test", "chr1", 1, 1, alleles);
         final VariantContext ploidy3VC = vcb.genotypes(
@@ -319,7 +320,7 @@ public class PgenWriteTest {
             try {
                 pgenWriter.close();
             } catch (final PgenEmptyPgenException emptyPgenException) {
-                // this is expected because the ploidy exception is thrown on the very first variantwe try to
+                // this is expected because the ploidy exception is thrown on the very first variant we try to
                 // add, so no variants ever get written
             }
             throw ploidyException;
@@ -330,7 +331,7 @@ public class PgenWriteTest {
     @Test
     public void testRejectTooManyAltAlleles() throws IOException {
         final int ARTIFICALLY_LOW_MAX_ALLELE_THRESHOLD = 3;
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("tooManyAltAlelesTest");
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testRejectTooManyAltAlleles");
  
         final TestUtils.VcfMetaData vcfMetaData = TestUtils.getVcfMetaData(Paths.get("testdata/CEUtrioTest.vcf"));
         try (final PgenWriter pgenWriter = new PgenWriter(
@@ -376,11 +377,24 @@ public class PgenWriteTest {
             throw e;
          }
     }
-    
-    //todo: add a dataprovider that uses files with different combinations of missing gts
-    @Test
-    public void testMissingGenotypes() throws IOException {
-        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("writeBufferOverflow");
+
+    @DataProvider(name="missingGenotypes")
+    public Object[][] missingGenotypesProvider() {
+        return new Object[][] {
+            // genotype index for genotypes that should be missing
+            { List.of(0) },
+            { List.of(1) },
+            { List.of(2) },
+            { List.of(0, 1) },
+            { List.of(1, 2) },
+            { List.of(0, 2) },
+            { List.of(0, 1, 2) },
+        };
+    }
+
+    @Test(dataProvider = "missingGenotypes")
+    public void testMissingGenotypes(final List<Integer> requestedMissingGenotypeIndices) throws IOException, InterruptedException {
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testMissingGenotypes");
         final TestUtils.VcfMetaData vcfMetaData = TestUtils.getVcfMetaData(Paths.get("testdata/CEUtrioTest.vcf"));
         try (final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false);
              final PgenWriter writer = new PgenWriter(
@@ -388,20 +402,34 @@ public class PgenWriteTest {
                     vcfMetaData.vcfHeader(),
                     PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
                     EnumSet.noneOf(PgenWriteFlag.class),
-                    // use VARIANT_COUNT_UNKNOWN, since otherwise we'll get an exception because we didn't write
-                    // enough variants when the try-with-resources calls close on the writer
                     PgenWriter.VARIANT_COUNT_UNKNOWN, 
                     PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES)) {
-                // first, add one good variant
-                final VariantContext vc = reader.iterator().next();
-                writer.add(vc);
-
-                // now conjure up and write a bad variant that will cause buffer underflow due to having not enough genotypes
+                        
+            for (final VariantContext vc : reader) {
+                // write the variant with missing genotypes to the PGEN
                 final VariantContextBuilder vcb = new VariantContextBuilder(vc);
-                final List<Genotype> gts = new ArrayList<>(vc.getGenotypes());
-                gts.remove(0);
-                writer.add(vcb.genotypes(gts).make()); // throws a runtime exeption due to buffer underflow exception
+                final List<Genotype> oldGenotypes = new ArrayList<>(vc.getGenotypes());
+                final List<Genotype> remainingGenotypes = new ArrayList<>();
+                final Map<String, Integer> sampleNameToOffset = vcfMetaData.vcfHeader().getSampleNameToOffset();
+                for (final Genotype g : oldGenotypes) {
+                    if (!requestedMissingGenotypeIndices.contains(sampleNameToOffset.get(g.getSampleName()))) {
+                        remainingGenotypes.add(oldGenotypes.get(sampleNameToOffset.get(g.getSampleName())));
+                    }
+                }
+                writer.add(vcb.genotypes(remainingGenotypes).make());
+            }
         }
+
+        // now, round-trip the pgen back to a VCF, and verify that all of the missing genotypes are no-call
+        final Path plinkGeneratedVCF = TestUtils.pgenToVCF_plink2(pfs, "missing_genotypes", "--output-chr M");
+        try (final VCFFileReader reader = new VCFFileReader(plinkGeneratedVCF, false)) {
+            final Map<String, Integer> sampleNameToOffset = reader.getFileHeader().getSampleNameToOffset();
+            for (final VariantContext vc : reader) {
+                for (final Genotype g : vc.getGenotypes()) {
+                    Assert.assertEquals(g.isNoCall(), requestedMissingGenotypeIndices.contains(sampleNameToOffset.get(g.getSampleName())));
+                }
+            }
+        }    
     }
 
 }
