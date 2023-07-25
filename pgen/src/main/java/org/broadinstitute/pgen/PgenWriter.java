@@ -109,12 +109,16 @@ public class PgenWriter implements VariantContextWriter {
         }
     }
 
+    private static byte PHASED_CODE = (byte) 1;
+    private static byte UNPHASED_CODE = (byte) 0;
+
+    private List<String> sampleNames = null;
     private HtsPath pVarFile = null;
     private HtsPath pSamFile = null;
     private final int maxAltAlleles;
     private long pgenContextHandle;
     private ByteBuffer alleleBuffer;
-    private ByteBuffer phaseBuffer;
+    private ByteBuffer phasingBuffer;
     private VariantContextWriter pVarWriter;
     private long expectedVariantCount = 0L;
     private long droppedVariantCount = 0L;
@@ -210,6 +214,7 @@ public class PgenWriter implements VariantContextWriter {
         }
         this.maxAltAlleles = maxAltAlleles;
         this.expectedVariantCount = numberOfVariants;
+        this.sampleNames = vcfHeader.getGenotypeSamples();
 
        pgenContextHandle = openPgen(
             pgenFileName.getRawInputString(),
@@ -230,12 +235,12 @@ public class PgenWriter implements VariantContextWriter {
         }
         alleleBuffer.order(ByteOrder.LITTLE_ENDIAN);
  
-        phaseBuffer = createBuffer(vcfHeader.getNGenotypeSamples());
-        if (phaseBuffer == null) {
+        phasingBuffer = createBuffer(vcfHeader.getNGenotypeSamples());
+        if (phasingBuffer == null) {
             //createBuffer threw an async Java exception
             return;
         }
-        phaseBuffer.order(ByteOrder.LITTLE_ENDIAN);
+        phasingBuffer.order(ByteOrder.LITTLE_ENDIAN);
 
         // create the .pvar, and write the entire psam
         pVarFile = createPVAR(pgenFileName, vcfHeader);
@@ -271,8 +276,8 @@ public class PgenWriter implements VariantContextWriter {
             // we don't need to test for that here since we're only nulling out a variable on return
             destroyByteBuffer(alleleBuffer);
             alleleBuffer = null;    
-            destroyByteBuffer(phaseBuffer);
-            phaseBuffer = null;    
+            destroyByteBuffer(phasingBuffer);
+            phasingBuffer = null;    
        }
     }
 
@@ -288,57 +293,83 @@ public class PgenWriter implements VariantContextWriter {
             return;
         }
         
-        //reset buffer
         alleleBuffer.clear();
-        phaseBuffer.clear();
+        phasingBuffer.clear();
         final Map<Allele, Integer> alleleMap = buildAlleleMap(vc);
-     
+    
+        int i = 0;
         for (final Genotype g : vc.getGenotypes()) {
             if (g.getPloidy() != 2) {
                 throw new PgenException(
                     String.format("PGEN only supports diploid samples but a sample with ploidy = %d was found at variant %s",
                         g.getPloidy(),
                         vc.toStringWithoutGenotypes()));
+            } else if (g.getAlleles().size() != 2) {
+                throw new IllegalArgumentException(String.format("Bad allele count in genotype %d", g.getAlleles().size()));
+            } else if (i > sampleNames.size()) {
+                // for some reason, this VC has MORE genotypes than the header specified
+                throw new PgenException(
+                    String.format("Variant context sample count (%d) does not match VCF header sample count (%d)",
+                        sampleNames.size(),
+                        vc.getGenotypes().size()));
             }
 
-            if (g.getAlleles().size() != 2) {
-                throw new IllegalArgumentException(String.format("Bad allele count in genotype %d", g.getAlleles().size()));
+            // GVS doesn't populate genotypes that are no-call, so synthesize allele codes and phasing for any genotypes in
+            // between the last one that we populated (if any), and the one we currently have
+            while (i < sampleNames.size() && !g.getSampleName().equals(sampleNames.get(i))) {
+                updateAlleleBuffer(vc, null, null, PLINK2_NO_CALL_VALUE);
+                updatePhasingBuffer(vc, null, UNPHASED_CODE);
+                i++;
+            }
+
+            // if we terminated the loop because we never found a sample name that matches the sample name for this genotype,
+            // then we can't continue because we've already filled the buffer, but we're still hoding onto a genotype, so bail
+            if (i == sampleNames.size()) {
+                //TODO: fix this error message to say that the genotypes don't match the header or something
+                // for some reason, this VC either as MORE genotypes than the header specified, or else the samples are in a different order,
+                throw new PgenException(
+                    String.format("Variant context sample count (%d) does not match VCF header sample count (%d), or the samples order does not match the header sample order",
+                        sampleNames.size(),
+                        vc.getGenotypes().size()));
             }
 
             for (final Allele allele : g.getAlleles()) {
-                final Integer mapping = alleleMap.get(allele);
-                try {
-                    alleleBuffer.putInt(mapping);
-                } catch (final BufferOverflowException e) {
-                    throw new RuntimeException(
-                        String.format(
-                            "Buffer overflow at position: %d mapping: %d for variant: %s, genotype: %s allele: %s",
-                            alleleBuffer.position(),
-                            mapping,
-                            vc.toStringWithoutGenotypes(),
-                            g.toString(),
-                            allele.toString()),
-                        e);
-                }
+                updateAlleleBuffer(vc, g, allele, alleleMap.get(allele));
             }
-            phaseBuffer.put(g.isPhased() ? (byte) 1 : (byte) 0);
+            updatePhasingBuffer(vc, g, g.isPhased() ? PHASED_CODE : UNPHASED_CODE);
+            i++;
         }
-        if (alleleBuffer.position() != alleleBuffer.limit()) {
+
+        // if there are missing genotypes at the end of the VC, synthesize allele codes and phasing to fill out the
+        // buffers
+        while (i < sampleNames.size()) {
+            updateAlleleBuffer(vc, null, null, PLINK2_NO_CALL_VALUE);
+            updateAlleleBuffer(vc, null, null, PLINK2_NO_CALL_VALUE);
+            updatePhasingBuffer(vc, null, UNPHASED_CODE);
+            i++;
+        }
+        
+        if (i != sampleNames.size()) {
+            // for some reason, this VC has FEWER genotypes than the header specified
+            throw new PgenException(
+                String.format("Variant context sample count (%d) does not match VCF header sample count (%d)",
+                    sampleNames.size(),
+                    vc.getGenotypes().size()));
+        } else if (alleleBuffer.position() != alleleBuffer.limit()) {
             throw new IllegalStateException(
                 String.format("Allele buffer is not completely filled, position is %d but expected %d.",
                     alleleBuffer.position(),
                     alleleBuffer.limit()));
-        }
-        if (phaseBuffer.position() != phaseBuffer.limit()) {
+        } else if (phasingBuffer.position() != phasingBuffer.limit()) {
             throw new IllegalStateException(
                 String.format("Phase buffer is not completely filled, position is %d but expected %d.",
-                    phaseBuffer.position(),
-                    phaseBuffer.limit()));
+                    phasingBuffer.position(),
+                    phasingBuffer.limit()));
         }
 
         alleleBuffer.rewind();
-        phaseBuffer.rewind();
-        final boolean appendRet = appendAlleles(pgenContextHandle, alleleBuffer, phaseBuffer, alleleMap.size() - 1);
+        phasingBuffer.rewind();
+        final boolean appendRet = appendAlleles(pgenContextHandle, alleleBuffer, phasingBuffer, alleleMap.size() - 1);
         
         if (appendRet) { // only add to the pvar if appendAlleles succeeded
             pVarWriter.add(vc);
@@ -409,6 +440,37 @@ public class PgenWriter implements VariantContextWriter {
             throw new RuntimeIOException(String.format("Error writing the .psam file %s", pSamFile.getRawInputString()), e);
         }
         return pSamFile;
+    }
+
+    private void updateAlleleBuffer(final VariantContext vc, final Genotype genotype, final Allele allele, final Integer alleleCode) {
+        try {
+            alleleBuffer.putInt(alleleCode);
+        } catch (final BufferOverflowException e) {
+            throw new RuntimeException(
+                String.format(
+                    "Allele buffer overflow at position: %d code: %d for variant: %s, genotype: %s allele: %s",
+                    alleleBuffer.position(),
+                    alleleCode,
+                    vc.toStringWithoutGenotypes(),
+                    genotype == null ? "genotype missing" : genotype.toString(),
+                    allele == null ? "no allele present" : allele.toString()),
+                e);
+        }
+    }
+
+    private void updatePhasingBuffer(final VariantContext vc, final Genotype genotype, final byte phaseCode) {
+        try {
+            phasingBuffer.put(phaseCode);
+        } catch (final BufferOverflowException e) {
+            throw new RuntimeException(
+                String.format(
+                    "Phase buffer overflow at position: %d code: %d for variant: %s, genotype: %s",
+                    alleleBuffer.position(),
+                    phaseCode,
+                    vc.toStringWithoutGenotypes(),
+                    genotype == null ? "genotype missing" : genotype.toString()),
+                e);
+        }
     }
 
     private static Map<Allele, Integer> buildAlleleMap(final VariantContext vc) {
