@@ -13,7 +13,7 @@ library {
     targetLinkages = [linkages.static]
 }
 
- buildTypes {
+buildTypes {
     debug
     release
 }
@@ -30,6 +30,7 @@ tasks.withType(CppCompile).configureEach {
      }
     //establish C++11 as the language version/dialects
     compilerArgs.add "-std=c++11"
+    compilerArgs.add "-O3"
 }
 
 unitTest {
