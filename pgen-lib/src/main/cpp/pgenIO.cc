@@ -53,7 +53,7 @@ namespace pgenlib {
      *
      * An example PGEN writer lifecycle is illustrated here:
      *
-     *      const pgenlib::PgenContext *const pgen_context = pgenlib::openPgen(
+     *      const pgenlib::PgenContext *const pgen_context = pgenlib::OpenPgen(
      *          file_name,
      *          pgen_write_mode,
      *          pgen_write_flags,
@@ -64,8 +64,8 @@ namespace pgenlib {
      *      for (int i = 0; i < n_variants; i++) {
      *          pgenlib::AppendAlleles(pgen_context, allele_codes, allele_ct);
      *      }
-     *      long variantCount = GetNumberOfVariantsWritten(pgen_context);
-     *      ClosePgen(pgen_context, 0);
+     *      long variantCount = pgenlib::GetNumberOfVariantsWritten(pgen_context);
+     *      pgenlib::ClosePgen(pgen_context, 0);
      *
      *  Once the PgenContext has been closed, it can no longer be used to write allele codes.
      *
@@ -304,6 +304,7 @@ namespace pgenlib {
         }
     }
 
+    //cpdef append_partially_phased(self, np.ndarray[np.int32_t,mode="c"] allele_int32, np.ndarray[np.uint8_t,cast=True] phasepresent, object allele_ct = None):
     void AppendAllelesPartiallyPhased(
             const PgenContext *const pGenContext,
             const int32_t *allele_codes,
@@ -384,6 +385,7 @@ namespace pgenlib {
         throwOnPglErr(pglErr, "appendAlleles");
     }
 
+    // cpdef append_alleles(self, np.ndarray[np.int32_t,mode="c"] allele_int32, bint all_phased = False, object allele_ct = None):
     void AppendAllelesAllOrNonePhased(
             const PgenContext *const pGenContext,
             const int32_t *allele_codes,

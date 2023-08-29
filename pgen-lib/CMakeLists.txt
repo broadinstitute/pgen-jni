@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.23)
 
 # This file is used to allow local interactive execution and debugging of the BOOST tests
 # for the C++ code from within CLion. The actual build of the JNI and native components for
-# this project is managed by the gradle script and dev.nokee plugins.
+# this project is managed by the gradle script and dev.nokee plugins in the enclosing project.
 project(pgen_lib)
 
 set(CMAKE_CXX_STANDARD 11)
