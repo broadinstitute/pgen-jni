@@ -95,41 +95,44 @@ public class PgenWriteTest {
             
             // small, all bi-allelic, unphased (6 variants/3 samples), test once for each write mode, and for write mode != PGEN_FILE_MODE_BACKWARD_SEEK,
             // also test with variant count provided up front or not (PGEN_FILE_MODE_BACKWARD_SEEK always requires an acccurate variant count)
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, true, "--output-chr M", EnumSet.noneOf(PgenWriteFlag.class) },
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr M", EnumSet.noneOf(PgenWriteFlag.class) },
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr M", EnumSet.noneOf(PgenWriteFlag.class) },
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, true, "--output-chr M", EnumSet.noneOf(PgenWriteFlag.class) },
-            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, false, "--output-chr M", EnumSet.noneOf(PgenWriteFlag.class) },
+            // uses the b37 reference, so use the --output-chr code "MT"; technically this is the plink2 default, but secify it anyway just for the record
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, true, "--output-chr MT", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr MT", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr MT", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, true, "--output-chr MT", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/CEUtrioTest.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, false, "--output-chr MT", EnumSet.noneOf(PgenWriteFlag.class) },
 
             // slightly larger, all bi-allelic, phased (600 variants/2504 samples); the genotype concordance validation ignores
             // phasing for now since its not preserved by the pgen writer)
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, true, "--output-chr M", EnumSet.of(PgenWriteFlag.PRESERVE_PHASING) },
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr M", EnumSet.of(PgenWriteFlag.PRESERVE_PHASING) },
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr M", EnumSet.of(PgenWriteFlag.PRESERVE_PHASING) },
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, true, "--output-chr M", EnumSet.of(PgenWriteFlag.PRESERVE_PHASING) },
-            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, false, "--output-chr M", EnumSet.of(PgenWriteFlag.PRESERVE_PHASING) },
+            // uses the b37 reference, so use the --output-chr code "MT"; technically this is the plink2 default, but secify it anyway just for the record
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK, true, "--output-chr MT", EnumSet.of(PgenWriteFlag.PRESERVE_PHASING) },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr MT", EnumSet.of(PgenWriteFlag.PRESERVE_PHASING) },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr MT", EnumSet.of(PgenWriteFlag.PRESERVE_PHASING) },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, true, "--output-chr MT", EnumSet.of(PgenWriteFlag.PRESERVE_PHASING) },
+            { Paths.get("testdata/1kg_phase3_chr21_start.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX, false, "--output-chr MT", EnumSet.of(PgenWriteFlag.PRESERVE_PHASING) },
  
             // larger still, unphased, includes ~6000 multiallelic sites (~117,932 variants/10 samples)
-            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
-            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
-            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
-            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chrM", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/0000000000-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chrM", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chrM", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/0000000001-my_demo_filters.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chrM", EnumSet.noneOf(PgenWriteFlag.class) },
 
-            {  Paths.get("testdata/hg38_trio.pik3ca.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
-            {  Paths.get("testdata/hg38_trio.pik3ca.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
+            {  Paths.get("testdata/hg38_trio.pik3ca.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chrM", EnumSet.noneOf(PgenWriteFlag.class) },
+            {  Paths.get("testdata/hg38_trio.pik3ca.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chrM", EnumSet.noneOf(PgenWriteFlag.class) },
             // same as hg38_trio.pik3ca.vcf above, but with the genotypes for the (multi-allelic) variant at 179135392 modified so the last site allele
             // is not referenced by any genotype, and the (multi-allelic) variant at site 179170076 modified so the middle (index 1) allele is not
             // referenced by any genotype; this triggers the issue described https://groups.google.com/g/plink2-users/c/Sn5qVCyDlDw/m/GOWScY6tAQAJ
-            { Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
-            { Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, true, "--output-chr chrM", EnumSet.noneOf(PgenWriteFlag.class) },
+            { Paths.get("testdata/hg38_trio.pik3ca.unreferenced.allele.vcf").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chrM", EnumSet.noneOf(PgenWriteFlag.class) },
  
             // multiallelic, partially phase (phasing synthesized by randomly mutating the genotypes in 0000000000-my_demo_filters.vcf.gz)
-            { Paths.get("testdata/0000000000-my_demo_filters.partiallyphased.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.of(PgenWriteFlag.MULTI_ALLELIC, PgenWriteFlag.PRESERVE_PHASING) },
+             { Paths.get("testdata/0000000000-my_demo_filters.partiallyphased.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chrM", EnumSet.of(PgenWriteFlag.MULTI_ALLELIC, PgenWriteFlag.PRESERVE_PHASING) },
 
             // temporary/local test cases
-            // { Paths.get("testdata/external/0000000009-NHGRI_AnVIL_3K.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
-            // { Paths.get("testdata/external/0000000004-NHGRI_AnVIL_3K.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) },
-            // { Paths.get("testdata/external/0000000002-NHGRI_AnVIL_3K.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chr26", EnumSet.noneOf(PgenWriteFlag.class) }
+            // { Paths.get("testdata/external/0000000009-NHGRI_AnVIL_3K.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chrM", EnumSet.noneOf(PgenWriteFlag.class) },
+            // { Paths.get("testdata/external/0000000004-NHGRI_AnVIL_3K.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chrM", EnumSet.noneOf(PgenWriteFlag.class) },
+            // this test case fails round-trip concordance because some sits are dropped due to exceeding the max alternat allele count (the concordance test doesn't account for this)
+            // { Paths.get("testdata/external/0000000002-NHGRI_AnVIL_3K.vcf.gz").toAbsolutePath(), PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY, false, "--output-chr chrM", EnumSet.noneOf(PgenWriteFlag.class) }
         };
     }
 
