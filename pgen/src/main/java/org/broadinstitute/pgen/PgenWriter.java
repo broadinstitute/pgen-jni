@@ -109,14 +109,53 @@ public class PgenWriter implements VariantContextWriter {
         }
     }
 
+     /**
+     * Enum for representing the subset of plink2 chromosome coding schemes that are supported by this writer.
+     * In plink2, the chromosome coding scheme is used when writing various output formats
+     * (see https://www.cog-genomics.org/plink/2.0/data#irreg_output).
+     * The codes are used here to determine the names of the haploid sex chromosomes in the incoming data set, for purposes
+     * of correctly handling haploid calls.
+     */
+    public enum PgenChromosomeCode {
+        /**
+         * Autosomes numeric, X/Y single-character, MT two-character, XY/PAR1/PAR2 as usual.
+         * Aligns with the b37 reference. This is the default coding used by PLINK 2.
+         */
+        PLINK_CHROMOSOME_CODE_MT("MT", "X", "Y", "MT"),
+        /**
+         * PAR1/PAR2 as usual, other chromosomes are 'chr' followed by a numeric code.
+         * Aligns with the hg38 reference.
+         */
+        PLINK_CHROMOSOME_CODE_CHRM("chrM", "chrX", "chrY", "chrM");
+
+        private final String codeString;        // the corresponding chromosome code as recognized by the plink2 command line
+        private final String xChromosomeName;   // the chromosome name for the X chromosome for this chromosome code
+        private final String yChromosomeName;   // the chromosome name for the Y chromosome for this chromosome code
+        private final String mChromosomeName;   // the chromosome name for the mitochondrial chromosome for this chromosome code
+
+        private PgenChromosomeCode(final String codeString, final String xChromosomeName, final String yChromosomeName, final String mChromosomeName) {
+             this.codeString = codeString;
+             this.xChromosomeName = xChromosomeName;
+             this.yChromosomeName = yChromosomeName;
+             this.mChromosomeName = mChromosomeName;
+        }
+        public String value() { return this.codeString; }
+        public String getXChromosomeName() { return xChromosomeName; };
+        public String getYChromosomeName() { return yChromosomeName; };
+        public String getMChromosomeName() { return mChromosomeName; };
+    };
+
     private static byte PHASED_CODE = (byte) 1;
     private static byte UNPHASED_CODE = (byte) 0;
     private static int DIPLOID_PLOIDY = 2;
 
-    private List<String> sampleNames = null;
     private HtsPath pVarFile = null;
     private HtsPath pSamFile = null;
     private final int maxAltAlleles;
+    private final String xChromosomeName;
+    private final String yChromosomeName;
+    private final String mChromosomeName;
+    private List<String> sampleNames = null;
     private long pgenContextHandle;
     private ByteBuffer alleleBuffer;
     private ByteBuffer phasingBuffer;
@@ -163,6 +202,7 @@ public class PgenWriter implements VariantContextWriter {
      * @param pgenWriteMode the PGEN write mode to use (see {@link PgenWriteMode})
      * @param writeFlags the write flags to use - see {@link #PgenWriteFlag}. If phase information is present for the source genotypes, include
      * the {@link PgenWriteFlag#PRESERVE_PHASING} flag. If multi allelic variants are present, include the {@link PgenWriteFlag#MULTI_ALLELIC} flag.
+     * @param chromosomeCode the chromosome coding scheme to use - see {@link PgenChromosomeCode}
      * @param maxAltAlleles the maximum number of alternate alleles to consider; site with more alterate alleles than this value will be
      * silently dropped
      */
@@ -171,8 +211,9 @@ public class PgenWriter implements VariantContextWriter {
         final VCFHeader vcfHeader,
         final PgenWriteMode pgenWriteMode,
         final EnumSet<PgenWriteFlag> writeFlags,
+        final PgenChromosomeCode chromosomeCode,
         final int maxAltAlleles) {
-            this(pgenFileName, vcfHeader, pgenWriteMode, writeFlags, VARIANT_COUNT_UNKNOWN, PLINK2_MAX_ALTERNATE_ALLELES);
+            this(pgenFileName, vcfHeader, pgenWriteMode, writeFlags, chromosomeCode, VARIANT_COUNT_UNKNOWN, PLINK2_MAX_ALTERNATE_ALLELES);
     }
 
     /**
@@ -187,6 +228,7 @@ public class PgenWriter implements VariantContextWriter {
      * @param pgenWriteMode the pgen write mode to use (see {@link PgenWriteMode#})
      * @param writeFlags the write flags to use - see {@link #PgenWriteFlag}. If phase information is present for the source genotypes, include
      * the {@link PgenWriteFlag#PRESERVE_PHASING} flag. If multi allelic variants are present, include the {@link PgenWriteFlag#MULTI_ALLELIC} flag.
+     * @param chromosomeCode the chromosome coding scheme to use - see {@link PgenChromosomeCode}
      * @param numberOfVariants the number of variants to be written. if the number is unknown, use the sentinel value {@link PgenWriter#VARIANT_COUNT_UNKNOWN},
      * but doing so precludes the use of the PGEN write mode {@link PgenWriteMode#PGEN_FILE_MODE_BACKWARD_SEEK}
      * @param maxAltAlleles the maximum number of alternate alleles to consider; site with more alterate alleles than this value will be
@@ -197,6 +239,7 @@ public class PgenWriter implements VariantContextWriter {
         final VCFHeader vcfHeader,
         final PgenWriteMode pgenWriteMode,
         final EnumSet<PgenWriteFlag> writeFlags,
+        final PgenChromosomeCode chromosomeCode,
         final long numberOfVariants,
         final int maxAltAlleles) {
 
@@ -216,6 +259,20 @@ public class PgenWriter implements VariantContextWriter {
         this.maxAltAlleles = maxAltAlleles;
         this.expectedVariantCount = numberOfVariants;
         this.sampleNames = vcfHeader.getGenotypeSamples();
+
+        switch(chromosomeCode) {
+            // at the moment, the only difference between the two supported codes is the name of the mitochondrial chromosome, but capture the
+            // x and y chromosome names for completeness
+            case PLINK_CHROMOSOME_CODE_MT:
+            case PLINK_CHROMOSOME_CODE_CHRM:
+                this.xChromosomeName = chromosomeCode.getXChromosomeName();
+                this.yChromosomeName = chromosomeCode.getYChromosomeName();
+                this.mChromosomeName = chromosomeCode.getMChromosomeName();
+                break;
+            default:
+             throw new PgenException(
+                String.format("Unrecognized chromosome code name (%s)", chromosomeCode));
+        }
 
        pgenContextHandle = openPgen(
             pgenFileName.getRawInputString(),

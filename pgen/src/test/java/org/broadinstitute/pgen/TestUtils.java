@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.broadinstitute.pgen.PgenWriter.PgenChromosomeCode;
 import org.broadinstitute.pgen.PgenWriter.PgenWriteMode;
 import org.testng.Assert;
 
@@ -116,6 +117,7 @@ public class TestUtils {
     public static PgenFileSet vcfToPgen_jni(
             final Path originalVCF,
             final PgenWriteMode pgenWriteMode,
+            final PgenChromosomeCode chromosomeCode,
             final boolean useTrueVariantCount,
             final EnumSet<PgenWriter.PgenWriteFlag> writeFlags) throws IOException, InterruptedException {
         final PgenFileSet pgenFileSet = PgenFileSet.createTempPgenFileSet("vcfToPgen_jni");
@@ -126,6 +128,7 @@ public class TestUtils {
                     vcfMetaData.vcfHeader,
                     pgenWriteMode,
                     writeFlags,
+                    chromosomeCode,
                     useTrueVariantCount == true ? vcfMetaData.nVariants : PgenWriter.VARIANT_COUNT_UNKNOWN,
                     PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES)) {
             reader.forEach(vc -> writer.add(vc));
