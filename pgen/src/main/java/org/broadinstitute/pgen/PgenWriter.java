@@ -145,23 +145,29 @@ public class PgenWriter implements VariantContextWriter {
         public String getMChromosomeName() { return mChromosomeName; };
     };
 
-    private static byte PHASED_CODE = (byte) 1;
-    private static byte UNPHASED_CODE = (byte) 0;
-    private static int DIPLOID_PLOIDY = 2;
+    private static final byte PHASED_CODE = (byte) 1;
+    private static final byte UNPHASED_CODE = (byte) 0;
+    private static final int HAPLOID_PLOIDY = 1;
+    private static final int DIPLOID_PLOIDY = 2;
 
-    private HtsPath pVarFile = null;
-    private HtsPath pSamFile = null;
     private final int maxAltAlleles;
+    private final boolean lenientPloidyValidation;
+    private final List<String> sampleNames;
     private final String xChromosomeName;
     private final String yChromosomeName;
     private final String mChromosomeName;
-    private List<String> sampleNames = null;
+
+    private HtsPath pVarFile;
+    private HtsPath pSamFile;
+    private HtsPath logFile;
+    private VariantContextWriter pVarWriter;
+    private BufferedWriter logFileWriter;
     private long pgenContextHandle;
     private ByteBuffer alleleBuffer;
     private ByteBuffer phasingBuffer;
-    private VariantContextWriter pVarWriter;
     private long expectedVariantCount = 0L;
     private long droppedVariantCount = 0L;
+    private long droppedSampleCount = 0L;
 
     // ******************** Native JNI methods  ********************
     private static native long openPgen(String file, int pgenWriteModeInt, int writeFlags, long numberOfVariants, int numberOfSamples, int maxAltAlleles);
@@ -189,59 +195,41 @@ public class PgenWriter implements VariantContextWriter {
         }
     }
  
-    /**
-     * Create a PGEN writer for writing VariantContext objects to a Plink2 PGEN file. The writer creates a set of related PGEN
-     * files (.pgen/.pvar/.psam files). Depending on the {@link #PgenWriteMode} specified, may also create a .pgen.pgi file,
-     * or temporary/intermediate files.
-     * 
-     * Supports only diploid sites with fewer than {@link #PLINK2_MAX_ALTERNATE_ALLELES} (this value can be further limited using
-     * {@code maxAltAlleles}). Sites that exceed the maximum number of alternate alleles are silently dropped.
-     * 
-     * @param pgenFileName the name of the PGEN file to be created (must have a ".pgen" suffix)
-     * @param vcfHeader a valid VCF header for to use to create the pgen/pvar/psam files
-     * @param pgenWriteMode the PGEN write mode to use (see {@link PgenWriteMode})
-     * @param writeFlags the write flags to use - see {@link #PgenWriteFlag}. If phase information is present for the source genotypes, include
-     * the {@link PgenWriteFlag#PRESERVE_PHASING} flag. If multi allelic variants are present, include the {@link PgenWriteFlag#MULTI_ALLELIC} flag.
-     * @param chromosomeCode the chromosome coding scheme to use - see {@link PgenChromosomeCode}
-     * @param maxAltAlleles the maximum number of alternate alleles to consider; site with more alterate alleles than this value will be
-     * silently dropped
-     */
-    public PgenWriter(
-        final HtsPath pgenFileName,
-        final VCFHeader vcfHeader,
-        final PgenWriteMode pgenWriteMode,
-        final EnumSet<PgenWriteFlag> writeFlags,
-        final PgenChromosomeCode chromosomeCode,
-        final int maxAltAlleles) {
-            this(pgenFileName, vcfHeader, pgenWriteMode, writeFlags, chromosomeCode, VARIANT_COUNT_UNKNOWN, PLINK2_MAX_ALTERNATE_ALLELES);
-    }
-
-    /**
+   /**
      * Create a PGEN writer for writing VariantContexts to a Plink2 PGEN file. The writer creates a set of related PGEN files (.pgen and
      * .pvar/.psam files). Depending on the {@link #PgenWriteMode} specified, may also create a .pgen.pgi file.
      * 
      * Supports only diploid sites with fewer than {@link #PLINK2_MAX_ALTERNATE_ALLELES} (this value can be further limited using
-     * {@code maxAltAlleles}. Sites that exceed the maximum number of alternate alleles are silently dropped.
+     * {@code maxAltAlleles}. Sites that exceed the maximum number of alternate alleles are silently dropped (but will be written to the
+     * log file if one is provided). If no log file is provided, any sample that does not have a conforming ploidy (haploid or diploid for
+     * sex chromosomes, or stricly diploid for autosomes) will cause an exception to be thrown. Failure to provide a log file does not
+     * change the behavior of
      * 
      * @param pgenFileName the name of the PGEN file to be created (must end in .pgen)
      * @param vcfHeader a valid VCF header to use to create the PGEN
      * @param pgenWriteMode the pgen write mode to use (see {@link PgenWriteMode#})
      * @param writeFlags the write flags to use - see {@link #PgenWriteFlag}. If phase information is present for the source genotypes, include
      * the {@link PgenWriteFlag#PRESERVE_PHASING} flag. If multi allelic variants are present, include the {@link PgenWriteFlag#MULTI_ALLELIC} flag.
-     * @param chromosomeCode the chromosome coding scheme to use - see {@link PgenChromosomeCode}
+     * @param chromosomeCode the plink2 chromosome coding scheme to use - see {@link PgenChromosomeCode}
+     * @param lenientPloidyValidation PGEN requires individual sample to be diploid (except for sex chromsomes, which may be haploid - these are accepted
+     * and recoded for pgen as heterozygous/diploid). By default, any ploidy failure will result in an exception to be thrown. Use tru for this value to
+     * tolerate ploidy failures (samples will be recoded as missing, and logged if a pg file is provided).
      * @param numberOfVariants the number of variants to be written. if the number is unknown, use the sentinel value {@link PgenWriter#VARIANT_COUNT_UNKNOWN},
      * but doing so precludes the use of the PGEN write mode {@link PgenWriteMode#PGEN_FILE_MODE_BACKWARD_SEEK}
      * @param maxAltAlleles the maximum number of alternate alleles to consider; site with more alterate alleles than this value will be
      * silently dropped
-     */
+     * @parm logFile any variants or samples that are dropped are logged to this file. may be null.
+     **/
     public PgenWriter(
         final HtsPath pgenFileName,
         final VCFHeader vcfHeader,
         final PgenWriteMode pgenWriteMode,
         final EnumSet<PgenWriteFlag> writeFlags,
         final PgenChromosomeCode chromosomeCode,
+        final boolean lenientPloidyValidation,
         final long numberOfVariants,
-        final int maxAltAlleles) {
+        final int maxAltAlleles,
+        final String logFile) {
 
         if (!pgenFileName.hasExtension(PGEN_EXTENSION)) {
             throw new PgenException(
@@ -274,7 +262,17 @@ public class PgenWriter implements VariantContextWriter {
                 String.format("Unrecognized chromosome code name (%s)", chromosomeCode));
         }
 
-       pgenContextHandle = openPgen(
+        if (logFile != null) {
+            this.logFile = new HtsPath(logFile);
+            try {
+                logFileWriter = Files.newBufferedWriter(this.logFile.toPath());
+            } catch (IOException e) {
+                throw new RuntimeIOException(String.format("Error opening dropped variants log file %s", logFile), e);
+            }
+        }
+        this.lenientPloidyValidation = lenientPloidyValidation;
+
+        pgenContextHandle = openPgen(
             pgenFileName.getRawInputString(),
             pgenWriteMode.value(),
             PgenWriteFlag.toIntFlags(writeFlags),
@@ -322,6 +320,14 @@ public class PgenWriter implements VariantContextWriter {
         pVarWriter.close();
         pVarWriter = null;
 
+        if (logFileWriter != null) {
+            try {
+                logFileWriter.close();
+            } catch (IOException e) {
+                throw new RuntimeIOException(String.format("Error closing dropped variants log file %s", logFile), e);
+            }
+        }
+
         // closePgen returns false if it had to throw an async Java exception, so test for that, and if it failed,
         // don't do anything else that might throw.
         //
@@ -348,6 +354,13 @@ public class PgenWriter implements VariantContextWriter {
     public void add(final VariantContext vc) {
         if (vc.getNAlleles() > maxAltAlleles) {
             droppedVariantCount++;
+            if (logFileWriter != null) {
+                try {
+                    logFileWriter.write(String.format("Dropped variant at: %s/%d - too many alleles (%d)\n", vc.getContig(), vc.getStart(), vc.getNAlleles()));
+                } catch (IOException e) {
+                    throw new RuntimeIOException(String.format("Error writing to dropped variants log file %s", logFile), e);
+                }
+            }
             return;
         }
         
@@ -364,22 +377,63 @@ public class PgenWriter implements VariantContextWriter {
         for (final String sampleName : sampleNames) {
             final Genotype g = vc.getGenotype(sampleName);
             if (g != null) {
-                if (g.getPloidy() != DIPLOID_PLOIDY) {
-                    throw new PgenException(
-                        String.format("PGEN only supports diploid samples but a sample with ploidy = %d was found at variant %s",
-                            g.getPloidy(),
-                            vc.toStringWithoutGenotypes()));
-                }
-                for (final Allele allele : g.getAlleles()) {
+                final int ploidy = g.getPloidy();
+                if (ploidy == HAPLOID_PLOIDY && (vc.getContig().equals(xChromosomeName) || vc.getContig().equals(yChromosomeName))) {
+                    // we have a haploid X or Y, and need to convert it to diploid to satisfy plink
+                    final List<Allele> alleles = g.getAlleles();
+                    if (alleles.size() != 1) {
+                        throw new PgenException(
+                            String.format("A genotype with haploid ploidy (%d) does not have one allele (%d) at variant (%s)",
+                                ploidy,
+                                alleles.size(),
+                                vc.toStringWithoutGenotypes()));
+                    }
+                    final Allele allele = alleles.get(0);
                     final Integer alleleCode = alleleMap.get(allele);
                     if (alleleCode == null) {
                         // do we need this test ? VariantContext doesn't seem to allow such a thing to be created
                         throw new PgenException(
                             String.format("Allele %s not found in allele map for variant %s", allele.toString(), vc.toStringWithoutGenotypes()));
                     }
-                    updateAlleleBuffer(vc, g, allele, alleleMap.get(allele));
+                    updateAlleleBuffer(vc, g, allele, alleleCode);
+                    updateAlleleBuffer(vc, g, allele, alleleCode);
+                    updatePhasingBuffer(vc, g, g.isPhased() ? PHASED_CODE : UNPHASED_CODE);
+                } else if (ploidy != DIPLOID_PLOIDY) {
+                    if (lenientPloidyValidation) {
+                        // if lenient, fill in unphased diploid no-call values for any genotype with questionable ploidy
+                        updateAlleleBuffer(vc, g, null, PLINK2_NO_CALL_VALUE);
+                        updateAlleleBuffer(vc, g, null, PLINK2_NO_CALL_VALUE);
+                        updatePhasingBuffer(vc, null, UNPHASED_CODE);
+                        if (logFileWriter != null) {
+                            try {
+                                logFileWriter.write(String.format("Coding non-diploid sample %s as missing at contig/start: %s %d",
+                                    g.getSampleName(),
+                                    vc.getContig(),
+                                    vc.getStart()));
+                                droppedSampleCount++;
+                            } catch (IOException e) {
+                                throw new RuntimeIOException(String.format("Error writing to dropped variants log file %s", logFile), e);
+                            }
+                        }
+                    } else {
+                        throw new PgenException(
+                            String.format("PGEN only supports diploid calls, but a non-diploid sample (%s) with ploidy (%d) was found at variant (%s)",
+                                g.getSampleName(),
+                                ploidy,
+                                vc.toStringWithoutGenotypes()));
+                    }
+                } else {
+                    for (final Allele allele : g.getAlleles()) {
+                        final Integer alleleCode = alleleMap.get(allele);
+                        if (alleleCode == null) {
+                            // do we need this test ? VariantContext doesn't seem to allow such a thing to be created
+                            throw new PgenException(
+                                String.format("Allele %s not found in allele map for variant %s", allele.toString(), vc.toStringWithoutGenotypes()));
+                        }
+                        updateAlleleBuffer(vc, g, allele, alleleCode);
+                    }
+                    updatePhasingBuffer(vc, g, g.isPhased() ? PHASED_CODE : UNPHASED_CODE);
                 }
-                updatePhasingBuffer(vc, g, g.isPhased() ? PHASED_CODE : UNPHASED_CODE);
             } else {
                 // fill in unphased diploid no-call values for the missing genotype
                 updateAlleleBuffer(vc, null, null, PLINK2_NO_CALL_VALUE);
@@ -409,9 +463,17 @@ public class PgenWriter implements VariantContextWriter {
     }
 
    /**
-     * @return the number of variants dropped because they exceeded the max alternate allele count
+     * @return the number of variants dropped because they exceeded the max alternate allele count. dropped variants are not written
+     * to the .pvar file, but are written to the log file if one was provided.
      */
     public long getDroppedVariantCount() { return droppedVariantCount; }
+
+    /**
+     * @return the number of times a sample was dropped because it did not satisfy the ploidy requirements (note that the same sample
+     * may be dropped multiple times, once for each site that it fails to satisfy the ploidy requirements for). dropped samples are
+     * written to the log file if one was provided.
+     */
+    public long getDroppedSampleCount() { return droppedSampleCount; }
 
      /**
      * @return the number of variants actually written to the PGEN

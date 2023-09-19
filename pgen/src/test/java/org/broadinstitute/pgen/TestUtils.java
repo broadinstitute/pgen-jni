@@ -26,6 +26,7 @@ import htsjdk.samtools.util.BufferedLineReader;
 import htsjdk.samtools.util.CloseableIterator;
 import htsjdk.samtools.util.FileExtensions;
 import htsjdk.samtools.util.IOUtil;
+import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFFileReader;
@@ -129,8 +130,10 @@ public class TestUtils {
                     pgenWriteMode,
                     writeFlags,
                     chromosomeCode,
+                    false,
                     useTrueVariantCount == true ? vcfMetaData.nVariants : PgenWriter.VARIANT_COUNT_UNKNOWN,
-                    PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES)) {
+                    PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES,
+                    null)) {
             reader.forEach(vc -> writer.add(vc));
             // display the variant counts
             System.out.println(String.format(
@@ -142,11 +145,12 @@ public class TestUtils {
     }
 
      // use plink2 to convert a VCF to PGEN and return the resulting (temporary) files as a PgenFileSet
-     public static PgenFileSet vcfToPgen_plink2(final Path originalVCF) throws IOException, InterruptedException {
+     public static PgenFileSet vcfToPgen_plink2(final Path originalVCF, final PgenChromosomeCode chromosomeCode) throws IOException, InterruptedException {
         final PgenFileSet pgenFileSet = PgenFileSet.createTempPgenFileSet("vcfToPgen_plink2");
         final String runCommand = String.format(
-            "plink2 --vcf %s --make-pgen --out %s",
+            "plink2 --vcf %s --output-chr %s --make-pgen --out %s",
             originalVCF.toAbsolutePath(),
+            chromosomeCode.value(),
             pgenFileSet.getFileSetPrefix());
  
         final int cmdResult = executeExternalCommand(runCommand);
@@ -232,7 +236,7 @@ public class TestUtils {
     }
 
     // compare two VCFs for genotype concordance - note that this does not compare the VCFHeaders
-    public static void verifyRoundTripGenotypeConcordance(final Path actualVCF, final Path expectedVCF, final boolean ignorePhasing) {        
+    public static void verifyRoundTripGenotypeConcordance(final Path actualVCF, final Path expectedVCF, final boolean ignorePhasing, final boolean ignoreGenotypeSwaps) {        
         long phaseMatches = 0L;
         long concordantPhaseFailures = 0L;
         try (final VCFFileReader expReader = new VCFFileReader(expectedVCF, false);
@@ -253,7 +257,7 @@ public class TestUtils {
                         throw new IllegalStateException("No corresponding jni variant for plink variant: " + actVariant);
                     }
                     final VariantContext expVariant = expIt.next();
-                    final long phaseFailures = assertVariantContextsAreNominallyEqual(actVariant, expVariant, ignorePhasing);
+                    final long phaseFailures = assertVariantContextsAreNominallyEqual(actVariant, expVariant, ignorePhasing, ignoreGenotypeSwaps);
                     concordantPhaseFailures += phaseFailures;
                     phaseMatches += (actHeader.getNGenotypeSamples() - phaseFailures); 
                }
@@ -267,13 +271,8 @@ public class TestUtils {
         }
     }
 
-    public static void displayPGENSize(final Path pgenFile, final String context) {
-        final long pgenSize = pgenFile.toFile().length();
-        System.out.println(String.format("%-6.6s\t%d", context, pgenSize)); 
-    }
-
     //Asserts that the two provided VariantContext objects have equal site/position and concordant genotypes (other attributes are ignored)
-    public static long assertVariantContextsAreNominallyEqual( final VariantContext actual, final VariantContext expected, final boolean ignorePhasing ) {
+    public static long assertVariantContextsAreNominallyEqual( final VariantContext actual, final VariantContext expected, final boolean ignorePhasing, final boolean ignoreGenotypeSwaps ) {
         Assert.assertNotNull(actual, "VariantContext expected not null");
         Assert.assertEquals(actual.getContig(), expected.getContig(), "chr");
         Assert.assertEquals(actual.getStart(), expected.getStart(), "start");
@@ -288,7 +287,7 @@ public class TestUtils {
             Assert.assertEquals(actual.getSampleNamesOrderedByName(), expected.getSampleNamesOrderedByName(), "sample names");
             final Set<String> samples = expected.getSampleNames();
             for ( final String sample : samples ) {
-                concordantPhaseFailures += assertGenotypesAreConcordant(actual.getGenotype(sample), expected.getGenotype(sample), ignorePhasing);
+                concordantPhaseFailures += assertGenotypesAreConcordant(actual.getGenotype(sample), expected.getGenotype(sample), ignorePhasing, ignoreGenotypeSwaps);
             }
         }
         return concordantPhaseFailures;
@@ -302,28 +301,36 @@ public class TestUtils {
 
     // Asserts that the two provided Genotype objects are concordant (not necessarily identical, only that the alleles and type match,
     // and that phasing matches for called variants (because plink2 changes homozygous variants to be phased, even if they're not, so
-    // we count these just to keep track, but accept them as concordant)
-    public static long assertGenotypesAreConcordant(final Genotype actual, final Genotype expected, final boolean ignorePhasing) {
+    // we count these just to keep track, but accept them as concordant).
+    public static long assertGenotypesAreConcordant(final Genotype actual, final Genotype expected, final boolean ignorePhasing, final boolean ignoreGenotypeSwaps) {
+        // if you're going to ignore genotype swaps, you better also ignore phasing...
+        Assert.assertTrue(ignoreGenotypeSwaps == false || ignorePhasing == true, "bad test argument combination");
+
         Assert.assertEquals(actual.getSampleName(), expected.getSampleName(), "Genotype sample names");
         Assert.assertEquals(actual.getType(), expected.getType(), "Genotype type");
-        Assert.assertTrue(expected.sameGenotype(actual, ignorePhasing), "Genotype alleles");
 
         long concordantPhaseFailures = 0L;
-        if (!ignorePhasing) {
-            final String actGenString = actual.getGenotypeString();
-            final String expGenString = expected.getGenotypeString();
-            if (!actGenString.equals(expGenString)) {
-                // plink2 roundtrips unphased genotypes that are either homozygous, or  no-calls, as phased, whether the input
-                // says they were phased or not, so detect and track those, but accept them as "concordant"
-                Assert.assertEquals(actual.getAllele(0), expected.getAllele(0));
-                Assert.assertEquals(actual.getAllele(1), expected.getAllele(1));
-                // now make sure they're homozygous (even if they're no-calls), since we only want to accept phase changes as
-                // "concordant" if they're homozygous. note that we test the allele directly since htsjdk doesn't return
-                // isHom()==true for "./." or ".|.", since they're neither homref nor homvar.
-                Assert.assertEquals(actual.getAllele(0), actual.getAllele(1));
-                concordantPhaseFailures++;
-            } else {
-                Assert.assertEquals(actGenString, expGenString);
+        if (ignoreGenotypeSwaps) {
+            // just check that the same alleles are present, even if swapped
+            assertEqualsSet(new HashSet<>(actual.getAlleles()), new HashSet<>(expected.getAlleles()), "Genotype alleles");
+        } else {
+            Assert.assertTrue(expected.sameGenotype(actual, ignorePhasing), "Genotype alleles");
+            if (!ignorePhasing) {
+                final String actGenString = actual.getGenotypeString();
+                final String expGenString = expected.getGenotypeString();
+                if (!actGenString.equals(expGenString)) {
+                    // plink2 roundtrips unphased genotypes that are either homozygous, or  no-calls, as phased, whether the input
+                    // says they were phased or not, so detect and track those, but accept them as "concordant"
+                    Assert.assertEquals(actual.getAllele(0), expected.getAllele(0));
+                    Assert.assertEquals(actual.getAllele(1), expected.getAllele(1));
+                    // now make sure they're homozygous (even if they're no-calls), since we only want to accept phase changes as
+                    // "concordant" if they're homozygous. note that we test the allele directly since htsjdk doesn't return
+                    // isHom()==true for "./." or ".|.", since they're neither homref nor homvar.
+                    Assert.assertEquals(actual.getAllele(0), actual.getAllele(1));
+                    concordantPhaseFailures++;
+                } else {
+                    Assert.assertEquals(actGenString, expGenString);
+                }
             }
         }
 
