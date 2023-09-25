@@ -15,6 +15,7 @@ import htsjdk.variant.variantcontext.writer.VariantContextWriter;
 import htsjdk.variant.variantcontext.writer.VariantContextWriterBuilder;
 import htsjdk.variant.variantcontext.writer.VariantContextWriterBuilder.OutputType;
 import htsjdk.variant.vcf.VCFHeader;
+import htsjdk.variant.vcf.VCFHeaderLine;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -505,6 +506,11 @@ public class PgenWriter implements VariantContextWriter {
             .setOutputPath(pVarFile.toPath())
             .setOutputFileType(OutputType.VCF) // plink2 expects the .pvar to have a .pvar extension
             .build();
+
+        // Ideally there would be a way to record the provenance/origin of a PGEN file right in the file itself, so we can tell
+        // identify files written by this writer, but there isn't. So instead we add a "source=..." line to the .pvar, similar to the
+        // "##source=PLINKv2.00" one plink adds when IT writes a .pvar:
+        vcfHeader.addMetaDataLine(new VCFHeaderLine("source", "\"Broad Institute PGEN/PVAR writer\""));
         pVarWriter.writeHeader(vcfHeader);
         return pVarFile;
     }
