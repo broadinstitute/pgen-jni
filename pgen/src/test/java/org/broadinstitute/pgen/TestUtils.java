@@ -8,6 +8,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -26,7 +27,6 @@ import htsjdk.samtools.util.BufferedLineReader;
 import htsjdk.samtools.util.CloseableIterator;
 import htsjdk.samtools.util.FileExtensions;
 import htsjdk.samtools.util.IOUtil;
-import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFFileReader;
@@ -43,9 +43,9 @@ public class TestUtils {
     public static final String SINGLE_SAMPLE_HEADER_SAMPLE_NAME = "atLeastOneSampleRequired";
 
     // class/record to hold a set of temporary plink2 companion files as paths (.pgen/.pvar/.psam/.log)
-    public record PgenFileSet(Path pGenPath, Path pVarPath, Path pSamPath, Path plinkLogFile) {
+    public record PgenFileSet(Path pGenPath, Path pVarPath, Path pSamPath, Path plinkLogPath, Path pgenLogPath) {
 
-        // create a trio of temporaary pgen files (.pgen/.pvar/.psam), and mark them, and any other possible companion files, for deletion
+        // create a trio of temporary pgen files (.pgen/.pvar/.psam), and mark them, and any other possible companion files, for deletion
         public static PgenFileSet createTempPgenFileSet(final String namePrefix) throws IOException {
             final String pGenExtension = PgenWriter.PGEN_EXTENSION;
 
@@ -63,10 +63,15 @@ public class TestUtils {
 
             // make sure any other possible companion files are also marked for deletion, even if they aren't used
 
-            // the .log file
-            final Path pLogPath = pGenPath.resolveSibling(pgenNameWithoutExtension + plinkLogExtension).toAbsolutePath();
-            pLogPath.toFile().createNewFile();
-            pLogPath.toFile().deleteOnExit();
+            // the plink2 .log file
+            final Path pPlinkLogPath = pGenPath.resolveSibling(pgenNameWithoutExtension + plinkLogExtension).toAbsolutePath();
+            pPlinkLogPath.toFile().createNewFile();
+            pPlinkLogPath.toFile().deleteOnExit();
+
+            // the PGEN writer .log file
+            final Path pGenLogPath = pGenPath.resolveSibling(pgenNameWithoutExtension + plinkLogExtension).toAbsolutePath();
+            pGenLogPath.toFile().createNewFile();
+            pGenLogPath.toFile().deleteOnExit();
 
            // the .pgi index file
            final Path pGenIndexPath = pGenPath.resolveSibling(pgenNameWithoutExtension + PgenWriter.PGEN_INDEX_EXTENSION).toAbsolutePath();
@@ -78,7 +83,7 @@ public class TestUtils {
            pGenTempPath.toFile().createNewFile();
            pGenTempPath.toFile().deleteOnExit();
 
-           return new PgenFileSet(pGenPath, pVarPath, pSamPath, pLogPath);
+           return new PgenFileSet(pGenPath, pVarPath, pSamPath, pPlinkLogPath, pGenLogPath);
         }
 
         // return the full pathname of the fileset's pgen file, without the file extension
@@ -337,8 +342,20 @@ public class TestUtils {
         return concordantPhaseFailures;
     }
 
-     // Creates a temp file that will be deleted on exit after tests are complete.
-     public static File createTempFile(final String name, final String extension) {
+    // read an external file into a String
+    public static String readTextFile(final Path logFile) throws IOException {
+        final StringBuilder sb = new StringBuilder();
+        try (final InputStream logStream = Files.newInputStream(logFile);
+             final BufferedReader errBufferedReader = new BufferedLineReader(logStream)) {
+            while (errBufferedReader.ready()) {
+                sb.append(errBufferedReader.readLine());
+            }
+        }
+        return sb.toString();
+    }
+
+    // Creates a temp file that will be deleted on exit after tests are complete.
+    public static File createTempFile(final String name, final String extension) {
         try {
             final File file = File.createTempFile(name, extension);
             file.deleteOnExit();

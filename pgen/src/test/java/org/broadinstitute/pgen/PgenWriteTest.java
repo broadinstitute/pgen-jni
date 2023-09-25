@@ -394,9 +394,9 @@ public class PgenWriteTest {
         };
     }
 
-    // reject non-diploid variants
+    // reject non-diploid samples if lenientPloidyValidation==false
     @Test(expectedExceptions = PgenException.class)
-    public void testRejectNonDiploid() throws IOException {
+    public void testNonDiploidStrict() throws IOException {
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testRejectNonDiploid");
         final List<Allele> alleles = List.of(Allele.REF_A, Allele.ALT_C, Allele.ALT_G);
         final VariantContextBuilder vcb = new VariantContextBuilder("test", "chr1", 1, 1, alleles);
@@ -441,9 +441,52 @@ public class PgenWriteTest {
         }
     }
 
-    // verify that we really do drop variants that exceed the maximum alterate allele threshold
+    // verify that if lenientPloidyValiation==true, we mark non-diploid samples as missing just for the one site; and verify 
+    // that we count how many of these we drop, and that the event is written to a log file if one is provided
     @Test
-    public void testRejectTooManyAltAlleles() throws IOException {
+    public void testNonDiploidLenient() throws IOException, InterruptedException {
+        final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testRejectNonDiploid");
+        final List<Allele> alleles = List.of(Allele.REF_A, Allele.ALT_C, Allele.ALT_G);
+        final VariantContextBuilder vcb = new VariantContextBuilder("test", "chr1", 1, 1, alleles);
+        final VariantContext ploidy3VC = vcb.genotypes(
+            List.of(new GenotypeBuilder().name(TestUtils.SINGLE_SAMPLE_HEADER_SAMPLE_NAME).alleles(alleles).make())
+        ).make();
+        Assert.assertEquals(ploidy3VC.getMaxPloidy(2), 3);
+
+        try (final PgenWriter pgenWriter = new PgenWriter(
+                new HtsPath(pfs.pGenPath().toAbsolutePath().toString()),
+                TestUtils.createSingleSampleVCFHeader(),
+                PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
+                EnumSet.noneOf(PgenWriteFlag.class),
+                PgenChromosomeCode.PLINK_CHROMOSOME_CODE_MT,
+                true, // LENIENT required for this test
+                PgenWriter.VARIANT_COUNT_UNKNOWN,
+                PgenWriter.PLINK2_MAX_ALTERNATE_ALLELES,
+                pfs.pgenLogPath().toAbsolutePath().toString())) {
+            Assert.assertEquals(pgenWriter.getDroppedSampleCount(), 0);
+            pgenWriter.add(ploidy3VC);
+            Assert.assertEquals(pgenWriter.getDroppedSampleCount(), 1);
+        }
+
+        // now verify that we logged the dropped variant to the log file
+        final String logString = TestUtils.readTextFile(pfs.pgenLogPath());
+        Assert.assertTrue(logString.contains("Coding non-diploid sample atLeastOneSampleRequired as missing at contig/start: chr1 1"));
+
+        // now convert the pgen back to VCF and verify that the sample is now marked as missing
+        final String extraPlinkArgs = "--output-chr " + PgenChromosomeCode.PLINK_CHROMOSOME_CODE_MT.value();
+        final Path vcfFromPGEN_jni = TestUtils.pgenToVCF_plink2(pfs, "FromJNI", extraPlinkArgs);
+
+        try (final VCFFileReader vcfReader = new VCFFileReader(vcfFromPGEN_jni, false)) {
+            for (final VariantContext v : vcfReader) {
+                Assert.assertTrue(v.getGenotype(TestUtils.SINGLE_SAMPLE_HEADER_SAMPLE_NAME).isNoCall());
+            }
+        }
+    }
+
+    // verify that we drop variants that exceed the maximum alterate allele threshold, that we count how many
+    // of these we drop, and that we write them to a log file if one is provided
+    @Test
+    public void testDropSitesWithTooManyAltAlleles() throws IOException {
         final int ARTIFICALLY_LOW_MAX_ALLELE_THRESHOLD = 3;
         final PgenFileSet pfs = PgenFileSet.createTempPgenFileSet("testRejectTooManyAltAlleles");
  
@@ -454,10 +497,10 @@ public class PgenWriteTest {
                 PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX,
                 EnumSet.noneOf(PgenWriteFlag.class),
                 PgenChromosomeCode.PLINK_CHROMOSOME_CODE_MT,    // doesn't matter
-               false,
+                false,
                 vcfMetaData.nVariants() + 1, // add one to account for the synthetic variant that we add that gets dropped
                 ARTIFICALLY_LOW_MAX_ALLELE_THRESHOLD,
-                null)) {
+                pfs.pgenLogPath().toAbsolutePath().toString())) {
 
             try (final VCFFileReader reader = new VCFFileReader(new File("testdata/CEUtrioTest.vcf"), false)) {
                 reader.forEach(vc -> pgenWriter.add(vc));
@@ -474,7 +517,11 @@ public class PgenWriteTest {
 
             Assert.assertEquals(pgenWriter.getWrittenVariantCount(), vcfMetaData.nVariants());
             Assert.assertEquals(pgenWriter.getDroppedVariantCount(), 1);    
-         }
+        }
+        
+        // now verify that we logged the dropped variant to the log file
+        final String logString = TestUtils.readTextFile(pfs.pgenLogPath());
+        Assert.assertTrue(logString.contains("Dropped variant at: chr1/1 - too many alleles (4)"));
     }
 
     // verify that we reject attempts to set a max alternate allele threshold that exceeds the plink2 maximum
