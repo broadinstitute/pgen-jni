@@ -4,6 +4,8 @@
 
 package org.broadinstitute.pgen;
 
+import com.github.luben.zstd.ZstdOutputStream;
+
 import htsjdk.io.HtsPath;
 import htsjdk.samtools.util.Log;
 import htsjdk.samtools.util.RuntimeIOException;
@@ -19,6 +21,7 @@ import htsjdk.variant.vcf.VCFHeaderLine;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -61,7 +64,7 @@ public class PgenWriter implements VariantContextWriter {
 
     public static String PGEN_EXTENSION = ".pgen";
     public static String PGEN_INDEX_EXTENSION = ".pgen.pgi";    
-    public static String PVAR_EXTENSION = ".pvar";
+    public static String PVAR_EXTENSION = ".pvar.zst";
     public static String PSAM_EXTENSION = ".psam";
  
     /**
@@ -316,8 +319,6 @@ public class PgenWriter implements VariantContextWriter {
 
     @Override
     public void close() {
-        //System.out.println(String.format("Multiallelic: %d NonSNP: %d MNP: %d", multiallelic_ct, nonSNP_ct, mnp_ct));
-   
         pVarWriter.close();
         pVarWriter = null;
 
@@ -500,16 +501,23 @@ public class PgenWriter implements VariantContextWriter {
         final HtsPath pVarFile = new HtsPath(pgenFile.toPath()
             .resolveSibling(pgenFilePrefix + PgenWriter.PVAR_EXTENSION)
             .toAbsolutePath().toString());
+        final OutputStream pVarOutputStream = pVarFile.getOutputStream();
+        ZstdOutputStream zstdStream;
+        try {
+            zstdStream = new ZstdOutputStream(pVarOutputStream);
+        } catch (final IOException e) {
+            throw new RuntimeIOException(String.format("Error creating the zstd output stream for the .pvar file %s", pVarFile.getRawInputString()), e);
+        }
+        // technically we're writing a PVAR, not a VCF, but we can do so by composing the VCFWriter with a ZstdOutputStream
         pVarWriter = new VariantContextWriterBuilder()
             .clearOptions()
             .setOptions(EnumSet.of(Options.DO_NOT_WRITE_GENOTYPES, Options.ALLOW_MISSING_FIELDS_IN_HEADER))
-            .setOutputPath(pVarFile.toPath())
-            .setOutputFileType(OutputType.VCF) // plink2 expects the .pvar to have a .pvar extension
-            .build();
+            .setOutputStream(zstdStream)
+           .build();
 
-        // Ideally there would be a way to record the provenance/origin of a PGEN file right in the file itself, so we can tell
-        // identify files written by this writer, but there isn't. So instead we add a "source=..." line to the .pvar, similar to the
-        // "##source=PLINKv2.00" one plink adds when IT writes a .pvar:
+        // Ideally there would be a way to record the provenance/origin of a PGEN file right in the file itself, so we can identify
+        // files written by this writer, but there isn't. So instead add a "source=..." VCF header line to the .pvar, similar to the
+        // "##source=PLINKv2.00" one plink2 adds when it writes a .pvar:
         vcfHeader.addMetaDataLine(new VCFHeaderLine("source", "\"Broad Institute PGEN/PVAR writer\""));
         pVarWriter.writeHeader(vcfHeader);
         return pVarFile;

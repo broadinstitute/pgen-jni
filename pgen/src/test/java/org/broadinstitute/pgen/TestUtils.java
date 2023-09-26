@@ -142,7 +142,7 @@ public class TestUtils {
             reader.forEach(vc -> writer.add(vc));
             // display the variant counts
             System.out.println(String.format(
-                    "%d variants written\n%d variants dropped",
+                    "%d variants written\\%d variants dropped",
                     writer.getWrittenVariantCount(),
                     writer.getDroppedVariantCount()));
         }
@@ -153,7 +153,7 @@ public class TestUtils {
      public static PgenFileSet vcfToPgen_plink2(final Path originalVCF, final PgenChromosomeCode chromosomeCode) throws IOException, InterruptedException {
         final PgenFileSet pgenFileSet = PgenFileSet.createTempPgenFileSet("vcfToPgen_plink2");
         final String runCommand = String.format(
-            "plink2 --vcf %s --output-chr %s --make-pgen --out %s",
+            "plink2 --make-pgen vzs --vcf %s --output-chr %s --out %s",
             originalVCF.toAbsolutePath(),
             chromosomeCode.value(),
             pgenFileSet.getFileSetPrefix());
@@ -175,7 +175,7 @@ public class TestUtils {
         makeCompanionLogFileTemporary(plinkGeneratedVCF, FileExtensions.VCF);
         
         final String runCommand = String.format(
-            "plink2 --pfile %s %s --export vcf --out %s",
+            "plink2 --pfile %s vzs %s --export vcf --out %s",
             pgenFileSet.getFileSetPrefix(),
             additionalArgs == null ? "" : additionalArgs,
             PgenWriter.getAbsoluteFileNameWithoutExtension(plinkGeneratedVCF, FileExtensions.VCF));
@@ -190,7 +190,7 @@ public class TestUtils {
 	//     plink2 --pfile pgenFile --validate
     public static void validatePgen_plink2(final PgenFileSet pgenFileSet) throws IOException, InterruptedException {
         final String runCommand = String.format(
-            "plink2 --pfile %s --validate",
+            "plink2 --pfile %s vzs --validate",
             pgenFileSet.getFileSetPrefix());
 
         final int cmdResult = executeExternalCommand(runCommand);
@@ -201,7 +201,7 @@ public class TestUtils {
 	//     plink2 --pfile pgenFile1 --pgen-diff pgenFile2
     public static void pgenDiff_plink2(final PgenFileSet sourceFileSet, final PgenFileSet targetFileSet) throws IOException, InterruptedException {
         final String runCommand = String.format(
-            "plink2 --pfile %s --pgen-diff %s",
+            "plink2 --pfile vzs %s --pgen-diff %s vzs",
             sourceFileSet.getFileSetPrefix(),
             targetFileSet.getFileSetPrefix());
 
@@ -372,7 +372,7 @@ public class TestUtils {
         return targetAbsolutePath.substring(0, targetAbsolutePath.lastIndexOf(extension));
     }
  
-    // generate a potential plink2-generated logfile name make sure its marked for deletion
+   // generate a potential plink2-generated logfile name make sure its marked for deletion
     private static Path makeCompanionLogFileTemporary(final Path plink2File, final String plink2FileExtension) {
         final File conversionLogFile = new File(plink2File.resolveSibling(
             getLocalFileNameWithoutExtension(plink2File, plink2FileExtension) + plinkLogExtension).toFile().toString());
