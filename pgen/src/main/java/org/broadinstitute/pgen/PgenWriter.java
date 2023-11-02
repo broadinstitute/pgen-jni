@@ -15,7 +15,6 @@ import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.writer.Options;
 import htsjdk.variant.variantcontext.writer.VariantContextWriter;
 import htsjdk.variant.variantcontext.writer.VariantContextWriterBuilder;
-import htsjdk.variant.variantcontext.writer.VariantContextWriterBuilder.OutputType;
 import htsjdk.variant.vcf.VCFHeader;
 import htsjdk.variant.vcf.VCFHeaderLine;
 
@@ -47,8 +46,8 @@ public class PgenWriter implements VariantContextWriter {
     private static Log logger = Log.getInstance(PgenWriter.class);
 
     /**
-     * variant count is not known up front, as long as the corresponding file mode param used is either {@code #PGEN_FILE_MODE_WRITE_SEPARATE_INDEX}
-     * or {@code #PGEN_FILE_MODE_WRITE_AND_COPY} (the write mode must not be {@link #PGEN_FILE_MODE_BACKWARD_SEEK}, which requires an accurate
+     * variant count is not known up front, as long as the corresponding file mode param used is either {@link #PgenWriteMode.PGEN_FILE_MODE_WRITE_SEPARATE_INDEX}
+     * or {@link #PgenWriteMode.PGEN_FILE_MODE_WRITE_AND_COPY} (the write mode must not be {@link #PgenWriteMode.PGEN_FILE_MODE_BACKWARD_SEEK}, which requires an accurate
      * upfront variant count).
      */
     public static long VARIANT_COUNT_UNKNOWN = 0x7ffffffd; // plink2::kPglMaxVariantCt
@@ -201,7 +200,7 @@ public class PgenWriter implements VariantContextWriter {
  
    /**
      * Create a PGEN writer for writing VariantContexts to a Plink2 PGEN file. The writer creates a set of related PGEN files (.pgen and
-     * .pvar/.psam files). Depending on the {@link #PgenWriteMode} specified, may also create a .pgen.pgi file.
+     * .pvar/.psam files). Depending on the {@code #PgenWriteMode} specified, may also create a .pgen.pgi file.
      * 
      * Supports only diploid sites with fewer than {@link #PLINK2_MAX_ALTERNATE_ALLELES} (this value can be further limited using
      * {@code maxAltAlleles}. Sites that exceed the maximum number of alternate alleles are silently dropped (but will be written to the
@@ -211,8 +210,8 @@ public class PgenWriter implements VariantContextWriter {
      * 
      * @param pgenFileName the name of the PGEN file to be created (must end in .pgen)
      * @param vcfHeader a valid VCF header to use to create the PGEN
-     * @param pgenWriteMode the pgen write mode to use (see {@link PgenWriteMode#})
-     * @param writeFlags the write flags to use - see {@link #PgenWriteFlag}. If phase information is present for the source genotypes, include
+     * @param pgenWriteMode the PGEN write mode to use (see {@code PgenWriteMode})
+     * @param writeFlags the write flags to use - see {@code PgenWriteFlag}. If phase information is present for the source genotypes, include
      * the {@link PgenWriteFlag#PRESERVE_PHASING} flag. If multi allelic variants are present, include the {@link PgenWriteFlag#MULTI_ALLELIC} flag.
      * @param chromosomeCode the plink2 chromosome coding scheme to use - see {@link PgenChromosomeCode}
      * @param lenientPloidyValidation PGEN requires individual sample to be diploid (except for sex chromsomes, which may be haploid - these are accepted
