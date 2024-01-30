@@ -1,8 +1,16 @@
 # Ignore Gradle project-specific cache directory
 .gradle
 
-# Ignore Gradle build output directory
-build
+# Ignore Gradle build output directory, except for the (mac dylib component)
+/build/
+/pgen-lib/build/
+/pgen/build/classes/
+/pgen/build/generated/
+/pgen/build/objs/
+/pgen/build/reports/
+/pgen/build/test-results/
+/pgen/build/tmp/
+/pgen/build/libs/*.jar
 
 #Ignore .idea and .vscode directories
 .idea

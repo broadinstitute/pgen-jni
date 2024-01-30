@@ -75,6 +75,14 @@ jar {
         from("$project.buildDir/libs/main/linux") {
             include "libpgen.so"
         }
+     
+        println "**********************************************************************************************************************************\n"
+        println "           Building a jar on linux: the macos libpgen.dylib in the mac_dylib folder will be included in the jar\n"
+        println "**********************************************************************************************************************************"
+    
+        from("$project.rootDir/mac_dylib") {
+            include "libpgen.dylib"
+        }
     } else {
         throw org.gradle.api.tasks.StopExecutionException("unsupported platform - only linux and macos are supported");
     }
