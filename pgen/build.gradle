@@ -1,5 +1,7 @@
 import org.gradle.internal.os.OperatingSystem
 
+// See the repo README.md to understand how to use this file to build to publish the pgen-jni jar.
+
 plugins {
     id 'java'
     id 'dev.nokee.jni-library'
@@ -32,7 +34,7 @@ dependencies {
     api 'com.github.samtools:htsjdk:3.0.0'
     api 'org.apache.commons:commons-lang3:3.5'
     api 'commons-io:commons-io:2.5'
-    
+
     // use the zstd implementation that is used by org.apache.commons:commons-compress directly
     api 'com.github.luben:zstd-jni:1.5.5-5' // contains a native component
 
@@ -64,27 +66,40 @@ jar {
         } else if (OperatingSystem.current().isLinux()) {
             sharedLibraryLinux
         } else {
-            throw org.gradle.api.tasks.StopExecutionException("unsupported platform - only linux and macos are supported");
+            throw org.gradle.api.tasks.StopExecutionException("Unsupported build platform - only linux and macos are supported");
         }
     }
+
     if (OperatingSystem.current().isMacOsX()) {
-        from("$project.buildDir/libs/main/macos") {
-            include "libpgen.dylib"
+        if (isRelease) {
+            throw org.gradle.api.tasks.StopExecutionException("Unsupported release platform. Release/publish task can only be run on linux.");
+        } else {
+            from("$project.buildDir/libs/main/macos") {
+                include "libpgen.dylib"
+            }
         }
     } else if (OperatingSystem.current().isLinux()) {
+        if (isRelease) {
+            println "**********************************************************************************************************************************"
+            println ""
+            println "  Building a jar on linux: the release jar will contain the macos libpgen.dylib that is checked into the mac_dylib folder"
+            println ""
+            println "**********************************************************************************************************************************"
+            from("$project.rootDir/mac_dylib") {
+                include "libpgen.dylib"
+            }
+        }
         from("$project.buildDir/libs/main/linux") {
             include "libpgen.so"
         }
-     
-        println "**********************************************************************************************************************************\n"
-        println "           Building a jar on linux: the macos libpgen.dylib in the mac_dylib folder will be included in the jar\n"
-        println "**********************************************************************************************************************************"
-    
-        from("$project.rootDir/mac_dylib") {
-            include "libpgen.dylib"
-        }
     } else {
-        throw org.gradle.api.tasks.StopExecutionException("unsupported platform - only linux and macos are supported");
+        throw org.gradle.api.tasks.StopExecutionException("Unsupported build platform - only linux and macos are supported");
+    }
+
+    manifest {
+        attributes 'Implementation-Title': 'pgen-jni',
+            'Implementation-Vendor': 'Broad Institute GATK Development Team',
+            'Implementation-Version': version
     }
 }
 
@@ -95,14 +110,14 @@ tasks.named('test') {
         showStandardStreams = true
     }
     // set the variable that causes the native component to be loaded from java.library.path so that we can run
-    // tests locally without a jar
+    // tests locally (ie., from VS Code) without a jar
     jvmArgs += "-DLOAD_PGEN_FROM_LIBRARY_PATH=true"
     if (OperatingSystem.current().isMacOsX()) {
         jvmArgs += "-Djava.library.path=/Users/cnorman/projects/pgen-jni/pgen/build/libs/main/macos"
     } else if (OperatingSystem.current().isLinux()) {
         jvmArgs += "-Djava.library.path=/Users/cnorman/projects/pgen-jni/pgen/build/libs/main/linux"
     } else {
-        throw org.gradle.api.tasks.StopExecutionException("unsupported platform - only linux and macos are supported");
+        throw org.gradle.api.tasks.StopExecutionException("Unsupported build platform - only linux and macos are supported");
     }
 }
 
@@ -126,7 +141,7 @@ task sourcesJar(type: Jar) {
 
 def basePomConfiguration = {
     packaging = 'jar'
-    description = 'JNI Wrapper for pgenlib'
+    description = 'JNI Wrapper for pgen-lib'
     url = 'http://github.com/broadinstitute/gatk'
 
     scm {
@@ -157,7 +172,7 @@ publishing {
         pgenlib(MavenPublication) {
             //from components.java
             artifact jar
-            artifactId = "pgenlib"
+            artifactId = "pgen-jni"
             pom basePomConfiguration
 
             artifact sourcesJar

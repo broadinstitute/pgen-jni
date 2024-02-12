@@ -11,9 +11,9 @@ The Java implementation uses an underlying native component, which is built here
 source files, plus some source files taken directly from the plink2 (that are used by plink2 to build the pgen-lib target).
 ## Artifacts
 
-### Supported platforms:
-- linux 64
-- macos 64
+### Supported runtime platforms:
+- linux x64
+- macos x64
 
 aarm64 is not yet supported (limitation of the dev-nokee gradle native code/JNI plugin)
 
@@ -28,7 +28,32 @@ and a recent [plink2](https://www.cog-genomics.org/plink/2.0/) executeable (must
 to be installed in /usr/local/boost.
 
 Currently, the project only builds components for the architecture on which the build is running. A [Docker file]() is provided to
-make it easy to build the native components on Linux.
+make it easy to build the native component on Linux and publish the results.
+### Publishing/Releasing pgen-jni
+
+The pgen-jni jar file that is published should include both a .dylib (for Macos) and a .so (for linux). The correct version is dynamically
+selected at ruimte based on the platform on which the jar file is running.
+
+Because no attempt has been made in this project to support/enable cross-compilation of these components on anything other than their own
+native environment(s), each component must be built in it's own native environment. However, since we want both components included in
+the published jar, publishing is only supported on linux (it is recommended to run the publishing task from a Docker container built from
+the Dockerfile included in the repo), and the publishing protocol requires that the mac component be built first on Macos; with the resulting
+.dylib then checked into the repo. The publish process can then be run on linux.
+
+The steps to publish are:
+1. Build the mac component on macos (./gradlew clean test jar). Make sure the tests all succeed.
+2. Copy the newly created libpgen.dylib file from libs/main/macos into the mac_dylib folder, overwriting the previously checked in version.
+3. Commit the updated .dylib to the repo (create a single commit with only that change, in order to cleanly preserve the record of updates).
+4. Push the changes to the repo.
+5. Create a build environment on linux (it is easiest to use the Dockerfile in the root of the repo as the publish environment, since that
+contains all of the dependencies necesssary to build the native linux component, the jar file, and to run the tests). If using the Docker
+image, you mut also configure a git email and user name (config --global user.email YOUR_EMAIL && git config --global user.name "YOUR NAME"),
+and the Artifactory user name and password must be set in the environment: ()"export ARTIFACTORY_USERNAME=username && export ARTIFACTORY_PASSWORD=password").
+6. Clone the repo and build the linux component (./gradlew clean test jar). Make sure all of the tests have passed.
+7. Create a tag for the release (git tag your_tag -m "Your message.")
+8. Run the release/publish task (./gradlew -Drelease=true clean publishAllPublicationsToArtifactoryRepository)
+9. Push the new tag up to the repo.
+
 ### Projects
 
 There are two (gradle) sub-projects:
