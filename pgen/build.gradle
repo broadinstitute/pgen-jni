@@ -30,11 +30,11 @@ buildTypes {
 
 dependencies {
     api 'com.github.samtools:htsjdk:3.0.0'
-
-    implementation 'org.apache.commons:commons-lang3:3.5'
-    implementation 'commons-io:commons-io:2.5'
+    api 'org.apache.commons:commons-lang3:3.5'
+    api 'commons-io:commons-io:2.5'
+    
     // use the zstd implementation that is used by org.apache.commons:commons-compress directly
-    implementation 'com.github.luben:zstd-jni:1.5.5-5' // contains a native component
+    api 'com.github.luben:zstd-jni:1.5.5-5' // contains a native component
 
     nativeImplementation project(':pgen-lib')
 
