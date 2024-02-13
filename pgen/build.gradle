@@ -80,11 +80,13 @@ jar {
         }
     } else if (OperatingSystem.current().isLinux()) {
         if (isRelease) {
+
             println "**********************************************************************************************************************************"
             println ""
             println "  Building a jar on linux: the release jar will contain the macos libpgen.dylib that is checked into the mac_dylib folder"
             println ""
             println "**********************************************************************************************************************************"
+ 
             from("$project.rootDir/mac_dylib") {
                 include "libpgen.dylib"
             }
@@ -97,6 +99,7 @@ jar {
     }
 
     manifest {
+        // implementation versions is used at runtime to stamp the output .pvar with a source and version number
         attributes 'Implementation-Title': 'pgen-jni',
             'Implementation-Vendor': 'Broad Institute GATK Development Team',
             'Implementation-Version': version

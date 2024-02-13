@@ -516,8 +516,12 @@ public class PgenWriter implements VariantContextWriter {
 
         // Ideally there would be a way to record the provenance/origin of a PGEN file right in the file itself, so we can identify
         // files written by this writer, but there isn't. So instead add a "source=..." VCF header line to the .pvar, similar to the
-        // "##source=PLINKv2.00" one plink2 adds when it writes a .pvar:
-        vcfHeader.addMetaDataLine(new VCFHeaderLine("source", "\"Broad Institute PGEN/PVAR writer\""));
+        // "##source=PLINKv2.00" line plink2 adds when it writes a .pvar. Attempt to use the jar's implementation version from the
+        // manifest, if it's available.
+        final String implementationVersion = this.getClass().getPackage().getImplementationVersion();
+        vcfHeader.addMetaDataLine(new VCFHeaderLine(
+            "source",
+                "\"Broad Institute PGEN/PVAR writer\"" + (implementationVersion == null ? "" : " version=" + implementationVersion)));
         pVarWriter.writeHeader(vcfHeader);
         return pVarFile;
     }
