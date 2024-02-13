@@ -16,7 +16,9 @@ repositories {
 }
 
 final isRelease = Boolean.getBoolean("release")
-version = gitVersion().replaceAll(".dirty", "") + (isRelease ?  "" : "-SNAPSHOT")
+//version = gitVersion().replaceAll(".dirty", "") + (isRelease ?  "" : "-SNAPSHOT")
+//TEMP hack to retain "SNAPSHOT" in the name even when releasing
+version = gitVersion().replaceAll(".dirty", "") + "-SNAPSHOT"
 
 sourceCompatibility = 1.17
 targetCompatibility = 1.17
