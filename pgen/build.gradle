@@ -98,12 +98,12 @@ jar {
         throw org.gradle.api.tasks.StopExecutionException("Unsupported build platform - only linux and macos are supported");
     }
 
-    manifest {
-        // implementation versions is used at runtime to stamp the output .pvar with a source and version number
-        attributes 'Implementation-Title': 'pgen-jni',
-            'Implementation-Vendor': 'Broad Institute GATK Development Team',
-            'Implementation-Version': version
-    }
+    // manifest {
+    //     attributes  'Implementation-Title': 'pgen-jni',
+    //         'Implementation-Vendor': 'Broad Institute GATK Development Team',
+    //         // Implementation-version is used at runtime to stamp the output .pvar with a source and version number
+    //         'Implementation-Version': version
+    // }
 }
 
 tasks.named('test') {
@@ -175,7 +175,7 @@ publishing {
         pgenlib(MavenPublication) {
             //from components.java
             artifact jar
-            artifactId = "pgen-jni"
+            artifactId = "pgenlib"
             pom basePomConfiguration
 
             artifact sourcesJar
