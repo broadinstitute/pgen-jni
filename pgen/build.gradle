@@ -144,7 +144,7 @@ task sourcesJar(type: Jar) {
 
 def basePomConfiguration = {
     packaging = 'jar'
-    description = 'JNI Wrapper for pgen-lib'
+    description = 'JNI Wrapper for pgenlib'
     url = 'http://github.com/broadinstitute/pgen-jni'
 
     scm {

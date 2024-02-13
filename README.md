@@ -99,13 +99,16 @@ The steps to publish are:
 4. Push the changes to the repo.
 5. Create a build environment on linux (it is easiest to use the Dockerfile in the root of the repo as the publish environment, since that
 contains all of the dependencies necesssary to build the native linux component, the jar file, and to run the tests). If using the Docker
-image, you mut also configure a git email and user name (`config --global user.email YOUR_EMAIL && git config --global user.name "YOUR NAME"`),
-and the Artifactory user name and password must be set in the environment: `export ARTIFACTORY_USERNAME=username && export ARTIFACTORY_PASSWORD=password`).
+image, you mut also configure a git email and user name (`config --global user.email YOUR_EMAIL && git config --global user.name "YOUR NAME"`).
+If you are publishing to Artifactory, the Artifactory user name and password must be set in the environment: `export ARTIFACTORY_USERNAME=username && export ARTIFACTORY_PASSWORD=password`). If you are publishing to maven, the corresponding variables for sonatype (`sonatypeUsername` and `sonatypePassword`)
+must be set.
 6. Clone the repo and build the linux component (`./gradlew clean test jar`). Make sure all of the tests pass.
 7. Create a tag for the release (`git tag your_tag -m "Your message."`)
-8. Run the release/publish task (`./gradlew -Drelease=true clean publishAllPublicationsToArtifactoryRepository`). `-Drelease=true` is important
+8. Run the release/publish task (`./gradlew -Drelease=true clean publishAllPublicationsToSonaTypeRepository` to publish to maven, or
+`./gradlew -Drelease=true clean publishAllPublicationsToArtifactoryRepository`) to publish to Artifactory. `-Drelease=true` is important
 as it is the signal to the build to include the native mac component in the jar along with the native linux component.
 9. Push the new tag up to the repo.
+10. **NOTE: SNAPSHOT builds that are published do not contain the mac native component.**
 
 ## Licensing
 With the exception of the files in **pgen-lib** folder, this project is
