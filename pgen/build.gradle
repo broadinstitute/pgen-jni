@@ -98,12 +98,12 @@ jar {
         throw org.gradle.api.tasks.StopExecutionException("Unsupported build platform - only linux and macos are supported");
     }
 
-    // manifest {
-    //     attributes  'Implementation-Title': 'pgen-jni',
-    //         'Implementation-Vendor': 'Broad Institute GATK Development Team',
-    //         // Implementation-version is used at runtime to stamp the output .pvar with a source and version number
-    //         'Implementation-Version': version
-    // }
+    manifest {
+        attributes  'Implementation-Title': 'pgen-jni',
+            'Implementation-Vendor': 'Broad Institute GATK Development Team',
+            // Implementation-version is used at runtime to stamp the output .pvar with a source and version number
+            'Implementation-Version': version
+    }
 }
 
 tasks.named('test') {
@@ -145,12 +145,12 @@ task sourcesJar(type: Jar) {
 def basePomConfiguration = {
     packaging = 'jar'
     description = 'JNI Wrapper for pgen-lib'
-    url = 'http://github.com/broadinstitute/gatk'
+    url = 'http://github.com/broadinstitute/pgen-jni'
 
     scm {
         url = 'scm:git@github.com:broadinstitute/gatk.git'
-        connection = 'scm:git@github.com:broadinstitute/gatk.git'
-        developerConnection = 'scm:git@github.com:broadinstitute/gatk.git'
+        connection = 'scm:git@github.com:broadinstitute/pgen-jni.git'
+        developerConnection = 'scm:git@github.com:broadinstitute/pgen-jni.git'
     }
 
     developers {
