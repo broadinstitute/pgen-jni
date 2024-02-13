@@ -139,7 +139,7 @@ namespace pgenlib {
         }
 
         // Round tripping multi-allelic data doesn't seem to work if the kWriteFlagMultiAllelic is set, unless
-        // there is also a  accompanying phase (or apparently, a dosage) track. This seems weird, but this comment
+        // there is also an accompanying phase (or apparently, a dosage) track. This seems weird, but this comment
         // on the PgenGlobalFlags enum in pgenlib_misc.h:
         //
         //  // Only guaranteed to be set when present if phase or dosage also present.
@@ -149,9 +149,9 @@ namespace pgenlib {
         // also phasing info, even if you really have multi-allelic data. If you have multi-allelic data but
         // no phasing, we don't set/accept it.
         //
-        // Thats the API really ? Should we relax this weirdness so its not exposed through the pgen-lib API, and
-        // instead just always accept the kWriteFlagMultiAllelic, but when it's present, silently remove it before
-        // delegating to plink2 in the C code if kWriteFlagPreservePhasing isn't also set ?
+        // Should we relax this weirdness so its not exposed through the pgen-lib API, and instead just always accept the
+        // kWriteFlagMultiAllelic, but when it's present, silently remove it before delegating to plink2 in the C code if
+        // kWriteFlagPreservePhasing isn't also set ?
         if ((writeFlags & kWriteFlagMultiAllelic) && !(writeFlags & kWriteFlagPreservePhasing)) {
             throw PgenException(
                     "The multi-allelic write flag should only be used if phasing information is also provided (even if the underlying data is multiallelic).");
