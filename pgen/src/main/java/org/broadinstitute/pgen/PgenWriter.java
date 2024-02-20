@@ -521,7 +521,10 @@ public class PgenWriter implements VariantContextWriter {
         final String implementationVersion = this.getClass().getPackage().getImplementationVersion();
         vcfHeader.addMetaDataLine(new VCFHeaderLine(
             "source",
-                "\"Broad Institute PGEN/PVAR writer\"" + (implementationVersion == null ? "" : " version=" + implementationVersion)));
+            String.format("\"Broad Institute PGEN/PVAR writer version=%s\"",
+                    implementationVersion == null ?
+                        " no version found in jar manifest" :
+                        implementationVersion)));
         pVarWriter.writeHeader(vcfHeader);
         return pVarFile;
     }
