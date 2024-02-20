@@ -3,14 +3,9 @@
 
 # Ignore Gradle build output directory, except for the (mac dylib component)
 /build/
+/pgen/build/
 /pgen-lib/build/
-/pgen/build/classes/
-/pgen/build/generated/
-/pgen/build/objs/
-/pgen/build/reports/
-/pgen/build/test-results/
-/pgen/build/tmp/
-/pgen/build/libs/*.jar
+/org/
 
 #Ignore .idea and .vscode directories
 .idea

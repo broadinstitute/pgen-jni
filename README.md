@@ -1,6 +1,6 @@
 # pgen-jni
 
-A Java PGEN writer, for writing [HTSJDK](https://github.com/samtools/htsjdk)
+A Java PGEN writer for writing [HTSJDK](https://github.com/samtools/htsjdk)
 [VariantContext](https://github.com/samtools/htsjdk/blob/master/src/main/java/htsjdk/variant/variantcontext/writer/VariantContextWriter.java)
 objects to a [plink2](https://www.cog-genomics.org/plink/2.0) [PGEN](https://www.cog-genomics.org/plink/2.0/input#pgen)
 file. The Java writer component implements the [HTSJDK](https://github.com/samtools/htsjdk)
@@ -8,10 +8,11 @@ file. The Java writer component implements the [HTSJDK](https://github.com/samto
 interface. See the plink2 pgen [spec](https://github.com/chrchang/plink-ng/tree/master/pgen_spec) for more information about the PGEN file format.
 
 The Java implementation uses an underlying native component, which is built here using a combination of local source files, plus some source
-files taken directly from the plink-ng repo. NOTE: This project is based on, and uses (an alpha version of) that plink-ng pgen writing source.
-See the notes below on how to update this project to use a newer version of plink-ng source.
+files taken directly from the plink-ng repo. (NOTE: This project is based on, and uses an alpha version of, that plink-ng pgen writing source.
+See the [Updating to newer versions of plink-ng](#updating-to-newer-versions-of-plink-ng) section below for instructions on how to update this
+project to use a newer version of plink-ng source.)
 
-## Supported runtime platforms:
+## Supported Runtime Platforms:
 - linux intel x64
 - macos intel x64
 
@@ -22,8 +23,9 @@ The generated artifacts are:
   - libpgen.dylib (for macOS 64-bit Intel)
   - libpgen.so  (for Linux 64-bit Intel)
 
-Since the inclusion of the native components in the **pgen-jni** jar is partly a manual process, see below for instructions on how to
-publish the jar.
+The inclusion of the native components in the **pgen-jni** jar is partly a manual process that must be executed when publishing project artifacts.
+See the [Publishing/Releasing pgen-jni](#publishingreleasing-pgen-jni) section below for instructions on how to properly inlcude these when publishing
+the jar.
 ## Project Structure
 
 There are two (gradle) sub-projects:
@@ -45,12 +47,14 @@ two logical parts:
   - **plink2** - the C/C++ types and functions that are part of the plink2 implementation, that are used by the pgenlib implementation
 
 ## Project Development
-For development and test execution, it is recommended to treat these as two separate projects, using the `VSCode` editor for the Java
-pgen project, and `CLion` or some other C++ compatible IDE for the **pgen-lib** project and boost tests.
+For development and test execution, it is recommended to treat these as two separate projects, using the `VS Code` editor for the Java
+pgen project, and `CLion` or some other C++ compatible IDE for the **pgen-lib** project and boost tests. Starter/sample 'VS Code' files can
+be found in the `.vscode` folder, though these will need to be edited to match your environment, and are provided only as a jump-start.
 
 The [dev-nokee](https://docs.nokee.dev/manual/jni-library-plugin.html) gradle plugin is used to build the entire project as a single unit
-(currently this only builds the native components for the architecture on which is its running; either macos or Linux), and to run the
-aggregate test suite (`./gradle clean test` will build and run both sets for tests for the current architecture).
+(currently this only builds the native components for the platform on which is its running; either macos or Linux), and to run the
+aggregate test suite (`./gradle clean test` will build and then run both sets of tests, but only for the platform on which the build is
+running - the Github actions workflow CI matrix uses runners for both Linux and Mac, so it builds and runs the tests on both platforms).
 
 ## Building pgen-jni
 
@@ -59,7 +63,7 @@ and a recent [plink-ng](https://www.cog-genomics.org/plink/2.0/) executeable (mu
 to be installed in `/usr/local/boost`.
 
 ### Docker File
-Currently, the project only builds components for the architecture on which the build is running. A [Docker file]() is included in the repo to
+Currently, the project only builds components for the platform on which the build is running. A [Docker file]() is included in the repo to
 make it easy to build and test the entire project, including the native component on Linux, and to publish the resulting artfacts.
 
 ## Updating to newer versions of plink-ng
