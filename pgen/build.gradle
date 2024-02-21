@@ -144,7 +144,7 @@ task sourcesJar(type: Jar) {
 
 def basePomConfiguration = {
     packaging = 'jar'
-    description = 'JNI Wrapper for pgenlib'
+    description = 'JNI Wrapper for pgen'
     url = 'http://github.com/broadinstitute/pgen-jni'
 
     scm {
@@ -172,7 +172,7 @@ def basePomConfiguration = {
 
 publishing {
     publications {
-        pgenlib(MavenPublication) {
+        pgen(MavenPublication) {
             //from components.java
             artifact jar
             artifactId = "pgen"
