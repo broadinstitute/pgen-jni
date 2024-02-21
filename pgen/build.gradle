@@ -164,7 +164,7 @@ def basePomConfiguration = {
     licenses {
         license {
             name = 'Apache 2.0'
-            url = 'https://github.com/broadinstitute/gatk/blob/master/LICENSE.TXT'
+            url = 'https://github.com/broadinstitute/pgen-jni/blob/main/pgen/LICENSE.txt'
             distribution = 'repo'
         }
     }
@@ -175,7 +175,7 @@ publishing {
         pgenlib(MavenPublication) {
             //from components.java
             artifact jar
-            artifactId = "pgenlib"
+            artifactId = "pgen"
             pom basePomConfiguration
 
             artifact sourcesJar
