@@ -17,3 +17,4 @@ pluginManagement {
 
 rootProject.name = 'pgen-jni'
 include('pgen')
+include('pgen-lib')

@@ -1,0 +1,43 @@
+plugins {
+	id 'dev.nokee.cpp-library'
+	id 'cpp-unit-test'
+}
+
+ repositories {
+     // Use Maven Central for resolving dependencies.
+     mavenCentral()
+}
+
+library {
+    targetMachines = [machines.macOS.x86_64, machines.linux.x86_64]
+    targetLinkages = [linkages.static]
+}
+
+buildTypes {
+    debug
+    release
+}
+
+dependencies {
+    // assumes boost 1.80.0 is installed in /usr/local/boost for C++ unit tests
+}
+
+tasks.withType(CppCompile).configureEach {
+    includes {
+        ["/usr/local/boost",
+        "${project(':pgen-lib').projectDir}/src/main/public",
+        "${project(':pgen-lib').projectDir}/src/main/headers"]
+     }
+    //establish C++11 as the language version/dialects
+    compilerArgs.add "-std=c++11"
+    compilerArgs.add "-O3"
+}
+
+unitTest {
+    targetMachines = [machines.linux.x86_64, machines.macOS.x86_64]
+
+    // the cpp-unit-test plugin doesn't seem to know about the dev.nokee.cpp-library plugin, so it has
+    // to be configured with the source explicitly
+    source.from file('src')
+}
+
