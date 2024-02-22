@@ -7,6 +7,7 @@ plugins {
     id 'dev.nokee.jni-library'
     id 'dev.nokee.cpp-language'
     id 'maven-publish'
+    id 'signing'
     id 'com.palantir.git-version' version '3.0.0'
 }
 
@@ -143,12 +144,13 @@ task sourcesJar(type: Jar) {
 }
 
 def basePomConfiguration = {
+    name = "Pgenlib"
     packaging = 'jar'
     description = 'JNI Wrapper for pgenlib'
     url = 'http://github.com/broadinstitute/pgen-jni'
 
     scm {
-        url = 'scm:git@github.com:broadinstitute/gatk.git'
+        url = 'scm:git@github.com:broadinstitute/pgen-jni.git'
         connection = 'scm:git@github.com:broadinstitute/pgen-jni.git'
         developerConnection = 'scm:git@github.com:broadinstitute/pgen-jni.git'
     }
@@ -164,7 +166,7 @@ def basePomConfiguration = {
     licenses {
         license {
             name = 'Apache 2.0'
-            url = 'https://github.com/broadinstitute/gatk/blob/master/LICENSE.TXT'
+            url = ' http://www.apache.org/licenses/LICENSE-2.0'
             distribution = 'repo'
         }
     }
@@ -175,6 +177,7 @@ publishing {
         pgenlib(MavenPublication) {
             //from components.java
             artifact jar
+            groupId = "org.broadinstitute"
             artifactId = "pgenlib"
             pom basePomConfiguration
 
@@ -185,23 +188,20 @@ publishing {
 
     repositories {
         maven {
-            name = "SonaType"
-            url =  "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
             credentials {
-                username = project.findProperty("sonatypeUsername")
-                password = project.findProperty("sonatypePassword")
+                username = isRelease ? project.findProperty("sonatypeUsername") : System.env.ARTIFACTORY_USERNAME
+                password = isRelease ? project.findProperty("sonatypePassword") : System.env.ARTIFACTORY_PASSWORD
             }
-        }
-
-        maven {
-            name = "Artifactory"
-            url = "https://broadinstitute.jfrog.io/broadinstitute/libs-snapshot-local/"
-            credentials {
-                username = System.env.ARTIFACTORY_USERNAME
-                password = System.env.ARTIFACTORY_PASSWORD
-            }
+            def release = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+            def snapshot = "https://broadinstitute.jfrog.io/broadinstitute/libs-snapshot-local/"
+            url = isRelease ? release : snapshot
         }
     }
+}
+
+signing {
+    required { isRelease && gradle.taskGraph.hasTask("publishPgenlibPublicationToMavenRepository") }
+    sign publishing.publications.pgenlib
 }
 
 publish {
