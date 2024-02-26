@@ -144,7 +144,7 @@ task sourcesJar(type: Jar) {
 }
 
 def basePomConfiguration = {
-    name = "Pgenlib"
+    name = "Pgenjni"
     packaging = 'jar'
     description = 'JNI Wrapper for pgenlib'
     url = 'http://github.com/broadinstitute/pgen-jni'
@@ -174,11 +174,11 @@ def basePomConfiguration = {
 
 publishing {
     publications {
-        pgenlib(MavenPublication) {
+        pgenjni(MavenPublication) {
             //from components.java
             artifact jar
             groupId = "org.broadinstitute"
-            artifactId = "pgenlib"
+            artifactId = "pgenjni"
             pom basePomConfiguration
 
             artifact sourcesJar
@@ -200,8 +200,8 @@ publishing {
 }
 
 signing {
-    required { isRelease && gradle.taskGraph.hasTask("publishPgenlibPublicationToMavenRepository") }
-    sign publishing.publications.pgenlib
+    required { isRelease && gradle.taskGraph.hasTask("publishPgenjniPublicationToMavenRepository") }
+    sign publishing.publications.pgenjni
 }
 
 publish {
