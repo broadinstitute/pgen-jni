@@ -107,14 +107,37 @@ contains all of the dependencies necesssary to build the native linux component,
 image, you mut also configure a git email and user name (`config --global user.email YOUR_EMAIL && git config --global user.name "YOUR NAME"`).
 If you are publishing to Artifactory, the Artifactory user name and password must be set (i.e., in the environment:
 `export ARTIFACTORY_USERNAME=username && export ARTIFACTORY_PASSWORD=password`, or in ./gradle/gradle.properties). If you are publishing to
-maven, the corresponding variables for sonatype (`sonatypeUsername` and `sonatypePassword`) must be set.
+maven, the corresponding variables for sonatype (`sonatypeUsername` and `sonatypePassword`) must be set. When publishing a relase version,
+a signing task is executed, so the signing password must also be set up.
 6. Clone the repo and build the linux component (`./gradlew clean test jar`). Make sure all of the tests pass.
 7. Create a tag for the release (`git tag your_tag -m "Your message."`)
-8. Run the release/publish task (`./gradlew -Drelease=true clean publishAllPublicationsToSonaTypeRepository` to publish to maven, or
+8. Run the release/publish task (`./gradlew -Drelease=true clean publish` or
+`./gradlew -Drelease=true clean publishPgenjniPublicationToMavenRepository` to publish to maven, or 
 `./gradlew -Drelease=true clean publishAllPublicationsToArtifactoryRepository`) to publish to Artifactory. `-Drelease=true` is important
 as it is the signal to the build to include the native mac component in the jar along with the native linux component.
 9. Push the new tag up to the repo.
-10. **NOTE: SNAPSHOT builds that are published do not contain the mac native component.**
+10. Go to https://oss.sonatype.org/#stagingRepositories, logging in if necessary. If you don't see anything, click "refresh".
+Find the release you just uploaded. It will probably be at the bottom with a name like comgithubbroadinstitute-1027, with your
+user ID listed as owner. Check the box next to your release, then select "close". Press the refresh button repeatedly until it updates
+and its status says "closed".
+11. Select your release again and click "release". Select the box to "automatically drop" in the pop-up confirmation dialog.
+12. Wait ~30-180 minutes for the maven central release to happen. Once it happens, it will show up on https://search.maven.org/.
+Due to caching on maven's website it's often available by directly navigating to the coordinates sooner than it shows up in search.
+Use this time to write release notes. Click on your new tag at https://github.com/broadinstitute/pgenjni/tags, then click "Create
+release from tag", then add a list of the major changes since the last release. Don't click "publish release" just yet. A good way
+to quickly auto-generate markdown-formatted release notes is with this command:
+git log --pretty=oneline PREVIOUS_VERSION..NEW_VERSION | grep -v "Merge pull request" | awk '{ $1=""; print "* " $0; }'
+Replacing PREVIOUS_VERSION and NEW_VERSION with the previous and current tags.
+Wait ~30-180 minutes for the maven central release to happen. Once it happens, it will show up on https://search.maven.org/. Due to caching on
+maven's website it's often available by directly navigating to the coordinates sooner than it shows up in search. Use this time to write release
+notes. Click on your new tag at https://github.com/broadinstitute/pgenjni/tags, then click "Create release from tag", then add a list of the major
+changes since the last release. Don't click "publish release" just yet. A good way to quickly auto-generate markdown-formatted release notes is with
+this command: git log --pretty=oneline PREVIOUS_VERSION..NEW_VERSION | grep -v "Merge pull request" | awk '{ $1=""; print "* " $0; }'
+Replacing PREVIOUS_VERSION and NEW_VERSION with the previous and current tags. In your pgenjni git clone, run ./gradlew -Drelease=true clean shadowJar.
+Back in the "edit" screen for your tag where you added release notes, click on "Attach binaries", and attach build/libs/pgenjni.jar from your pgenjni clone.
+Now with both release notes and a binary added to your tag on github, click "publish release" on the tag editing screen.
+
+**NOTE: SNAPSHOT builds that are published do not contain the mac native component.**
 
 ## Licensing
 With the exception of the files in **pgen-lib** folder, this project is
