@@ -29,10 +29,8 @@ RUN cd ${HOME} && \
     rm -f boost_1_80_0.tar.gz
 
 # install plink2 executeable (required to run tests)
-# use wget -q to supress wget from emitting aws keys into public logs
-RUN wget -q https://s3.amazonaws.com/plink2-assets/plink2_linux_x86_64_20240302.zip -P scripts && \
-    unzip scripts/plink2_linux_avx2_20230426.zip -d scripts && \
-    mv scripts/plink2 /usr/local/bin
+RUN unzip plink2-assets/plink2_linux_x86_64_20240318.zip -d plink2-assets && \
+    mv plink2-assets/plink2 /usr/local/bin
 
 # For some reason, the presence of this boost file seems to cause the build of the linux test component (gradle
 # task :pgen-lib:compileTestLinuxCpp) to fail. There are numerous online reports of various products failing to
