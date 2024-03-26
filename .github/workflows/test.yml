@@ -18,7 +18,7 @@ jobs:
             architecture: x86-64
       fail-fast: false
     continue-on-error: ${{ matrix.experimental }}
-    name: Linux ${{ matrix.Java }} build and test
+    name: Linux Java ${{ matrix.Java }} build and test
     steps:
       - uses: actions/checkout@v3
       - name: Set up java ${{ matrix.Java }}
@@ -53,7 +53,7 @@ jobs:
             architecture: x86-64
       fail-fast: false
     continue-on-error: ${{ matrix.experimental }}
-    name: MacOS ${{ matrix.Java }} build and test
+    name: MacOS Java ${{ matrix.Java }} build and test
     steps:
       - uses: actions/checkout@v3
       - name: Set up java ${{ matrix.Java }}
