@@ -6,8 +6,8 @@
 set -ex
 cd scripts
 # use wget -q to supress wget from emitting aws keys into public logs
-wget -q https://s3.amazonaws.com/plink2-assets/plink2_mac_20240205.zip -P scripts
-unzip scripts/plink2_mac_20240205.zip -d scripts
+wget -q https://s3.amazonaws.com/plink2-assets/plink2_mac_20240302.zip -P scripts
+unzip scripts/plink2_mac_20240302.zip -d scripts
 sudo mv scripts/plink2 /usr/local/bin
 
 # install boost 1.8.0 for tests
