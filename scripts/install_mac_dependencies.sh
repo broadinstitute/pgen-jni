@@ -4,7 +4,7 @@
 
 # install plink2 for roundtrip testing
 set -ex
-cd plink2-assets
+cd plink2_assets
 unzip plink2_mac_20240318.zip -d plink2_assets
 sudo mv plink2_assets/plink2 /usr/local/bin
 
