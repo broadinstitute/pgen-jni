@@ -5,8 +5,8 @@
 # install plink2 for roundtrip testing
 set -ex
 cd plink2-assets
-unzip plink2_mac_20240318.zip -d plink2-assets
-sudo mv plink2-assets/plink2 /usr/local/bin
+unzip plink2_mac_20240318.zip -d plink2_assets
+sudo mv plink2_assets/plink2 /usr/local/bin
 
 # install boost 1.8.0 for tests
 wget -q https://boostorg.jfrog.io/artifactory/main/release/1.80.0/source/boost_1_80_0.tar.gz -P scripts

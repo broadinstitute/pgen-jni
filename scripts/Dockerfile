@@ -29,8 +29,8 @@ RUN cd ${HOME} && \
     rm -f boost_1_80_0.tar.gz
 
 # install plink2 executeable (required to run tests)
-RUN unzip plink2-assets/plink2_linux_x86_64_20240318.zip -d plink2-assets && \
-    mv plink2-assets/plink2 /usr/local/bin
+RUN unzip plink2_assets/plink2_linux_x86_64_20240318.zip -d plink2_assets && \
+    mv plink2_assets/plink2 /usr/local/bin
 
 # For some reason, the presence of this boost file seems to cause the build of the linux test component (gradle
 # task :pgen-lib:compileTestLinuxCpp) to fail. There are numerous online reports of various products failing to
